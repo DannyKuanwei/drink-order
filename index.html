@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>員工訂飲料</title>
+<style>
+  :root { --brand:#7b4b2a; --brand2:#a9743f; --bg:#fbf6ef; --card:#fff; --line:#ece2d5; --ink:#3a2c1e; --muted:#9b8a76; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Microsoft JhengHei",system-ui,sans-serif; }
+  .wrap { max-width:560px; margin:0 auto; padding:14px 14px 60px; }
+  header { text-align:center; padding:14px 0 6px; }
+  header h1 { margin:0; font-size:24px; letter-spacing:2px; }
+  header .sub { color:var(--muted); font-size:13px; margin-top:4px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px; box-shadow:0 2px 10px rgba(120,80,40,.05); }
+  .card h2 { margin:0 0 12px; font-size:16px; letter-spacing:1px; display:flex; align-items:center; gap:8px; }
+  label.field { display:block; font-size:12px; color:var(--muted); margin:12px 0 6px; font-weight:700; letter-spacing:1px; }
+  input[type=text] { width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; outline:none; font-family:inherit; }
+  input[type=text]:focus { border-color:var(--brand2); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:9px 14px; border-radius:999px; border:1.5px solid var(--line); background:#fff; font-size:14px; cursor:pointer; user-select:none; transition:.12s; font-family:inherit; color:var(--ink); }
+  .chip.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+  .items { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .item { padding:12px; border-radius:14px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:left; transition:.12s; font-family:inherit; }
+  .item.on { border-color:var(--brand); background:#fbf1e7; }
+  .item .nm { font-size:15px; font-weight:700; color:var(--ink); }
+  .item .pr { font-size:12px; color:var(--muted); margin-top:3px; }
+  .submit { margin-top:16px; width:100%; padding:15px; border:none; border-radius:14px; background:var(--brand); color:#fff; font-size:17px; font-weight:800; letter-spacing:2px; cursor:pointer; font-family:inherit; }
+  .submit:active { transform:scale(.98); }
+  .submit:disabled { opacity:.45; }
+  .order { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px dashed var(--line); }
+  .order:last-child { border-bottom:none; }
+  .order .who { font-weight:800; min-width:64px; }
+  .order .what { flex:1; font-size:14px; line-height:1.5; }
+  .order .what .opt { color:var(--muted); font-size:12px; }
+  .order .pr { font-weight:800; color:var(--brand); white-space:nowrap; }
+  .order .del { border:none; background:#f6ece1; color:#c0563f; border-radius:8px; width:28px; height:28px; font-size:16px; cursor:pointer; flex:none; }
+  .empty { color:var(--muted); text-align:center; padding:18px 0; font-size:14px; }
+  .tally { display:flex; justify-content:space-around; text-align:center; margin-bottom:6px; }
+  .tally .n { font-size:26px; font-weight:900; color:var(--brand); }
+  .tally .t { font-size:12px; color:var(--muted); }
+  .breakdown { font-size:13px; color:var(--ink); line-height:1.9; margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
+  .breakdown span { color:var(--muted); }
+  footer { text-align:center; color:var(--muted); font-size:11px; margin-top:18px; line-height:1.7; }
+  .toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 20px; border-radius:999px; font-size:14px; opacity:0; transition:.25s; pointer-events:none; z-index:50; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧋 員工訂飲料</h1>
+    <div class="sub" id="sub">今日批次・載入中…</div>
+  </header>
+
+  <!-- 我要訂 -->
+  <div class="card">
+    <h2>📝 我要訂</h2>
+    <label class="field">你的名字</label>
+    <input type="text" id="person" placeholder="輸入姓名（會記住）" autocomplete="off" />
+
+    <label class="field">品項</label>
+    <div class="items" id="items"></div>
+
+    <label class="field">容量</label>
+    <div class="chips" id="sizes"></div>
+
+    <label class="field">甜度</label>
+    <div class="chips" id="sugars"></div>
+
+    <label class="field">冰塊</label>
+    <div class="chips" id="ices"></div>
+
+    <label class="field">加料 / 備註（選填）</label>
+    <input type="text" id="topping" placeholder="例如：加珍珠、去冰、大杯換燕麥奶…" autocomplete="off" />
+
+    <button class="submit" id="submit" disabled>請先選品項</button>
+  </div>
+
+  <!-- 今日訂單 -->
+  <div class="card">
+    <h2>📋 今日訂單 <span id="cupTag" style="font-size:13px;color:var(--muted);font-weight:400;"></span></h2>
+    <div id="list"><div class="empty">還沒有人訂，當第一個吧！</div></div>
+  </div>
+
+  <!-- 統計 -->
+  <div class="card">
+    <h2>📊 統計（給訂購人）</h2>
+    <div class="tally">
+      <div><div class="n" id="totCups">0</div><div class="t">總杯數</div></div>
+      <div><div class="n" id="totMoney">$0</div><div class="t">總金額</div></div>
+      <div><div class="n" id="totPeople">0</div><div class="t">訂購人數</div></div>
+    </div>
+    <div class="breakdown" id="breakdown"></div>
+  </div>
+
+  <footer>
+    價格與品項為通用範例，請依實際店家調整（改 index.html 的 MENU）。<br>
+    資料即時同步，所有人看到同一張單。
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ── Supabase 連線（anon key 本就供前端用）──
+const SUPA_URL = 'https://hhbgdfnnnfemqpzrjhnh.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoYmdkZm5ubmZlbXFwenJqaG5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjY1MDQsImV4cCI6MjA5MDYwMjUwNH0._eWQqiLd1baVS_bAdn0i5xa_gWOPby37lUTB17d1aHU';
+const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
+
+// ── 通用菜單（價格之後可改）──
+const MENU = [
+  { name:'紅茶',     m:25, l:30 },
+  { name:'綠茶',     m:25, l:30 },
+  { name:'烏龍茶',   m:25, l:30 },
+  { name:'奶茶',     m:35, l:45 },
+  { name:'鮮奶茶',   m:45, l:55 },
+  { name:'珍珠奶茶', m:45, l:55 },
+  { name:'波霸奶茶', m:45, l:55 },
+  { name:'檸檬綠茶', m:40, l:50 },
+  { name:'冬瓜茶',   m:30, l:40 },
+  { name:'多多綠',   m:45, l:55 },
+];
+const SUGARS = ['正常','少糖','半糖','微糖','無糖'];
+const ICES   = ['正常冰','少冰','微冰','去冰','熱'];
+const SIZES  = [['中杯','m'],['大杯','l']];
+
+// 今日批次（台北日期）
+const BATCH = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'}))
+  .toLocaleDateString('en-CA');  // yyyy-mm-dd
+document.getElementById('sub').textContent = `今日批次　${BATCH}`;
+
+// ── 選擇狀態 ──
+const sel = { item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
+
+const $ = id => document.getElementById(id);
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+
+// 記住名字
+$('person').value = localStorage.getItem('drink_person') || '';
+$('person').addEventListener('input', e => localStorage.setItem('drink_person', e.target.value.trim()));
+
+// 建品項按鈕
+const itemsEl = $('items');
+MENU.forEach(d => {
+  const b = document.createElement('button');
+  b.className = 'item'; b.dataset.name = d.name;
+  b.innerHTML = `<div class="nm">${d.name}</div><div class="pr">中 $${d.m}・大 $${d.l}</div>`;
+  b.onclick = () => { sel.item = d.name; document.querySelectorAll('.item').forEach(x=>x.classList.toggle('on', x===b)); updateSubmit(); };
+  itemsEl.appendChild(b);
+});
+// 容量 / 甜度 / 冰塊 chips
+function buildChips(elId, list, getVal, getLabel, initVal, onPick){
+  const el = $(elId);
+  list.forEach(v => {
+    const label = getLabel(v), val = getVal(v);
+    const c = document.createElement('button'); c.className='chip'+(val===initVal?' on':''); c.textContent=label;
+    c.onclick = () => { onPick(val); el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); updateSubmit(); };
+    el.appendChild(c);
+  });
+}
+buildChips('sizes', SIZES, v=>v[1], v=>v[0], 'm', v=>sel.sizeKey=v);
+buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
+buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
+
+function currentPrice(){ if(!sel.item) return 0; const d=MENU.find(x=>x.name===sel.item); return sel.sizeKey==='l'?d.l:d.m; }
+function updateSubmit(){
+  const ok = sel.item && $('person').value.trim();
+  const btn = $('submit'); btn.disabled = !ok;
+  btn.textContent = !sel.item ? '請先選品項' : !$('person').value.trim() ? '請先填名字' : `送出　$${currentPrice()}`;
+}
+$('person').addEventListener('input', updateSubmit);
+
+// ── 送出訂單 ──
+$('submit').onclick = async () => {
+  const person = $('person').value.trim();
+  if(!person || !sel.item) return;
+  $('submit').disabled = true;
+  const row = {
+    batch: BATCH, person, item: sel.item,
+    size: SIZES.find(s=>s[1]===sel.sizeKey)[0],
+    sugar: sel.sugar, ice: sel.ice,
+    topping: $('topping').value.trim() || null,
+    price: currentPrice(),
+  };
+  const { error } = await sb.from('drink_orders').insert(row);
+  if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
+  $('topping').value = '';
+  toast('✓ 已送出！');
+  load();
+};
+
+// ── 載入 + 渲染 ──
+async function load(){
+  const { data, error } = await sb.from('drink_orders')
+    .select('*').eq('batch', BATCH).order('created_at', { ascending: true });
+  if(error){ return; }
+  render(data || []);
+}
+function render(rows){
+  const list = $('list');
+  $('cupTag').textContent = rows.length ? `共 ${rows.length} 杯` : '';
+  if(rows.length === 0){ list.innerHTML = '<div class="empty">還沒有人訂，當第一個吧！</div>'; }
+  else {
+    list.innerHTML = '';
+    rows.forEach(r => {
+      const div = document.createElement('div'); div.className='order';
+      const opts = [r.size, r.sugar, r.ice].filter(Boolean).join('・');
+      div.innerHTML =
+        `<div class="who">${r.person}</div>`+
+        `<div class="what">${r.item}<br><span class="opt">${opts}${r.topping?'・'+r.topping:''}</span></div>`+
+        `<div class="pr">$${r.price}</div>`+
+        `<button class="del" title="刪除">×</button>`;
+      div.querySelector('.del').onclick = async () => {
+        if(!confirm(`刪除 ${r.person} 的 ${r.item}？`)) return;
+        await sb.from('drink_orders').delete().eq('id', r.id);
+        load();
+      };
+      list.appendChild(div);
+    });
+  }
+  // 統計
+  const cups = rows.length;
+  const money = rows.reduce((s,r)=>s+(r.price||0),0);
+  const people = new Set(rows.map(r=>r.person)).size;
+  $('totCups').textContent = cups;
+  $('totMoney').textContent = '$'+money;
+  $('totPeople').textContent = people;
+  const byItem = {};
+  rows.forEach(r=>{ byItem[r.item]=(byItem[r.item]||0)+1; });
+  $('breakdown').innerHTML = cups===0 ? '<span>尚無訂單</span>'
+    : Object.entries(byItem).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} <span>×${v}</span>`).join('　／　');
+}
+
+// ── 即時同步 ──
+sb.channel('drink_orders_live')
+  .on('postgres_changes', { event:'*', schema:'public', table:'drink_orders' }, () => load())
+  .subscribe();
+
+load();
+updateSubmit();
+</script>
+</body>
+</html>
