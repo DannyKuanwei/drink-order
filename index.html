@@ -81,7 +81,7 @@
     <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
 
     <button class="submit" id="submit" disabled>請先選店家與品項</button>
-    <div class="warn">⚠️ 品項為各店熱門款、價格為<b>參考值</b>，請依實際店家菜單核對後修改。電話待填。</div>
+    <div class="warn">菜單依岡山各店實際照片建立。得正、五十嵐已附電話；較密的菜單(Mr.Wish/金茶伍/水巷/樂法)請順手核對價格，要補品項或改價跟 Claude 說即可。</div>
   </div>
 
   <div class="card">
@@ -112,49 +112,62 @@ const SUPA_URL = 'https://hhbgdfnnnfemqpzrjhnh.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoYmdkZm5ubmZlbXFwenJqaG5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjY1MDQsImV4cCI6MjA5MDYwMjUwNH0._eWQqiLd1baVS_bAdn0i5xa_gWOPby37lUTB17d1aHU';
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
-// ── 店家與菜單（熱門品項；價格參考值，請核對。phone 待填）──
+// ── 店家與菜單（依岡山各店實際菜單照片建立，2024）──
 const SHOPS = [
-  { id:'dejeng', name:'得正', phone:'', menu:[
-    {name:'春烏龍(青)', m:35, l:45}, {name:'焙烏龍', m:35, l:45},
-    {name:'檸檬春烏龍', m:50, l:60}, {name:'甘蔗春烏龍', m:60, l:70},
-    {name:'優酪春烏龍', m:55, l:65}, {name:'芝士奶蓋焙烏龍', m:65, l:75},
-    {name:'焙烏龍鮮奶', m:60, l:70},
+  { id:'dejeng', name:'得正', phone:'07-6225168', menu:[
+    {name:'紅茶', m:25, l:30}, {name:'綠茶', m:25, l:30},
+    {name:'青烏龍', m:30, l:35}, {name:'焙烏龍', m:30, l:35},
+    {name:'奶茶', m:40, l:45}, {name:'焙烏龍奶茶', m:40, l:45},
+    {name:'黃金珍珠奶茶', m:50, l:55}, {name:'麻吉奶茶', m:50, l:55},
+    {name:'檸檬青烏龍', m:45, l:55}, {name:'甘蔗青烏龍', m:45, l:55},
+    {name:'葡萄柚青烏龍', m:50, l:55}, {name:'優酪青烏龍', m:50, l:55},
+    {name:'焙烏龍鮮奶', m:50, l:60}, {name:'青烏龍鮮奶', m:50, l:60},
+    {name:'芝士奶蓋紅茶', m:50, l:55}, {name:'芝士奶蓋焙烏龍', m:55, l:60},
   ]},
   { id:'mrwish', name:'Mr.Wish', phone:'', menu:[
-    {name:'珍珠紅茶', m:35, l:45}, {name:'漾檸檬綠', m:50, l:60},
-    {name:'葡萄柚綠茶', m:55, l:65}, {name:'百香QQ綠', m:55, l:65},
-    {name:'芒果冰沙', m:65, l:75}, {name:'草莓相思(季節)', m:65, l:75},
-    {name:'鮮柚青茶', m:55, l:65},
+    {name:'珍珠紅茶', m:40, l:55}, {name:'翡翠檸檬', m:60, l:70},
+    {name:'葡萄柚翡翠', m:65, l:75}, {name:'黃金鳳梨翡翠', m:65, l:75},
+    {name:'芒果鮮果茶', m:80, l:90}, {name:'草莓系列(季節)', m:80, l:90},
+    {name:'鮮柚青茶', m:60, l:70}, {name:'多多綠', m:55, l:65},
   ]},
   { id:'jincha', name:'金茶伍', phone:'', menu:[
     {name:'珍珠厚奶', m:50, l:60}, {name:'蔗香青茶', m:30, l:40},
-    {name:'純蜜Q粿紅茶', m:45, l:55}, {name:'高山烏龍', m:35, l:45},
-    {name:'荔枝小茉莉', m:55, l:65}, {name:'黃金蕎麥茶', m:35, l:45},
-    {name:'柳丁Q粿果粒茶', m:60, l:70},
+    {name:'Q粿紅茶', m:45, l:55}, {name:'高山烏龍', m:35, l:45},
+    {name:'黃金蕎麥茶', m:40, l:50}, {name:'荔枝小茉莉', m:55, l:65},
+    {name:'日光金萱', m:35, l:45}, {name:'柳丁Q粿果粒茶', m:60, l:70},
   ]},
   { id:'chanung', name:'水巷茶弄', phone:'', menu:[
-    {name:'珍珠奶茶', m:40, l:50}, {name:'紅茶瑪奇朵', m:45, l:55},
-    {name:'膠原奶茶', m:55, l:65}, {name:'蛋糕奶茶', m:55, l:65},
-    {name:'桂圓紅棗茶(季節)', m:55, l:65}, {name:'冬瓜檸檬', m:45, l:55},
-    {name:'四季春茶', m:25, l:35},
+    {name:'寒天玉小紫蘇', m:65, l:90}, {name:'膠原蛋白小紫蘇', m:65, l:90},
+    {name:'桔香小紫蘇', m:55, l:85}, {name:'茉莉蜜紅茶', m:30, l:55},
+    {name:'茉莉綠茶', m:30, l:55}, {name:'冬瓜烏龍', m:35, l:65},
+    {name:'金鑽鳳梨綠', m:60, l:60}, {name:'滿分水果茶', m:65, l:65},
+    {name:'紅茶拿鐵', m:60, l:90}, {name:'珍珠紅茶拿鐵', m:60, l:90},
   ]},
-  { id:'50lan', name:'五十嵐', phone:'', menu:[
-    {name:'四季春茶', m:30, l:40}, {name:'波霸奶茶', m:45, l:55},
-    {name:'珍珠奶茶', m:45, l:55}, {name:'冰淇淋紅茶', m:45, l:55},
-    {name:'四季春珍波椰', m:55, l:65}, {name:'檸檬綠茶', m:45, l:55},
-    {name:'多多綠', m:50, l:60},
+  { id:'50lan', name:'五十嵐', phone:'07-6242333', menu:[
+    {name:'茉莉綠茶', m:25, l:30}, {name:'阿薩姆紅茶', m:25, l:30},
+    {name:'四季春青茶', m:25, l:30}, {name:'波霸紅', m:25, l:35},
+    {name:'檸檬綠', m:40, l:50}, {name:'梅の綠', m:40, l:50},
+    {name:'8冰綠', m:40, l:50}, {name:'多多綠', m:50, l:60},
+    {name:'柚子茶', m:40, l:50}, {name:'奶茶', m:40, l:55},
+    {name:'珍珠奶茶', m:50, l:55}, {name:'波霸奶茶', m:50, l:55},
+    {name:'燕麥奶茶', m:55, l:60}, {name:'阿華田', m:45, l:60},
+    {name:'紅茶拿鐵', m:50, l:65}, {name:'冰淇淋紅茶', m:50, l:55},
   ]},
   { id:'lefa', name:'樂法', phone:'', menu:[
-    {name:'柳橙鮮綠', m:60, l:75}, {name:'蘋果蜂蜜綠', m:70, l:85},
-    {name:'鐵觀音歐蕾', m:65, l:80}, {name:'蘋果優利卡', m:90, l:105},
-    {name:'芭樂柳橙', m:70, l:85}, {name:'蘋果那堤', m:90, l:105},
-    {name:'檸檬蘋果綠', m:70, l:85},
+    {name:'蘋果鮮柚', m:70, l:90}, {name:'蘋果鮮綠', m:70, l:90},
+    {name:'蘋果柳橙檸檬', m:75, l:95}, {name:'草莓奶霜(NEW)', m:90, l:90},
+    {name:'草莓多多', m:75, l:75}, {name:'芒果系列', m:65, l:80},
+    {name:'蜜桃系列', m:70, l:90}, {name:'多多綠', m:50, l:60},
   ]},
   { id:'guiji', name:'龜記', phone:'', menu:[
-    {name:'冬瓜檸檬', m:45, l:55}, {name:'麻吉燒仙草', m:55, l:65},
-    {name:'烏龍奶茶', m:45, l:55}, {name:'珍珠撞奶', m:50, l:60},
-    {name:'金鑽鳳梨綠', m:55, l:65}, {name:'梅好冬瓜', m:45, l:55},
-    {name:'蜜香紅茶', m:35, l:45},
+    {name:'極品紅茶', m:35, l:35}, {name:'翡翠綠茶', m:35, l:35},
+    {name:'三十三紅茶', m:40, l:40}, {name:'碎銀普洱茶', m:40, l:40},
+    {name:'花沫烏龍', m:40, l:40}, {name:'豆漿紅茶', m:45, l:45},
+    {name:'冬瓜茶王', m:45, l:45}, {name:'玉山雷夢', m:50, l:50},
+    {name:'楊桃雷夢', m:50, l:50}, {name:'極品奶茶', m:50, l:50},
+    {name:'翡翠奶茶', m:50, l:50}, {name:'三王奶茶', m:55, l:55},
+    {name:'極品鮮乳茶', m:65, l:65}, {name:'冬瓜鮮乳', m:65, l:65},
+    {name:'茶王鮮乳', m:69, l:69}, {name:'巧克鮮乳茶', m:69, l:69},
   ]},
 ];
 const SUGARS = ['正常','少糖','半糖','微糖','無糖'];
