@@ -74,6 +74,14 @@
   .order .pr { font-weight:800; color:var(--brand); white-space:nowrap; }
   .order .del { border:none; background:#f6ece1; color:#c0563f; border-radius:8px; width:28px; height:28px; font-size:16px; cursor:pointer; flex:none; }
   .empty { color:var(--muted); text-align:center; padding:18px 0; font-size:14px; }
+  .payrow { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px dashed var(--line); }
+  .payrow:last-child { border-bottom:none; }
+  .payrow .pn { flex:1; font-weight:700; }
+  .payrow .pn small { color:var(--muted); font-weight:400; font-size:12px; }
+  .payrow .pa { font-weight:800; color:var(--brand); white-space:nowrap; }
+  .payrow.done .pn, .payrow.done .pa { opacity:.5; text-decoration:line-through; }
+  .payrow label { display:flex; align-items:center; gap:5px; font-size:13px; color:#2f6b3a; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .payrow label input { width:18px; height:18px; accent-color:#2f6b3a; }
   .tally { display:flex; justify-content:space-around; text-align:center; margin-bottom:6px; }
   .tally .n { font-size:26px; font-weight:900; color:var(--brand); }
   .tally .t { font-size:12px; color:var(--muted); }
@@ -104,6 +112,7 @@
       <div class="chips" id="teamPicker"></div>
     </div>
     <div id="notOpen" class="notopen" style="display:none">🔒 目前尚未開團<br><span>請等團主在最下方開團後再點餐</span></div>
+    <div id="closedMsg" class="notopen" style="display:none">✅ 本團已結單<br><span>團主已截止點餐，要加點請洽團主</span></div>
     <div id="orderBody">
       <div class="groupbanner" id="groupBanner" style="display:none"></div>
       <p class="lead">填名字 → 選餐點 → 按送出，大家即時看到 👇</p>
@@ -154,6 +163,13 @@
     </div>
     <div id="subsidyTally" class="groupbanner" style="display:none;text-align:center"></div>
     <div id="shopTally"></div>
+  </div>
+
+  <div class="card" id="payCard" style="display:none">
+    <h2>💰 收錢清單（團主對帳） <span id="payTag" style="font-size:13px;color:var(--muted);font-weight:400;"></span></h2>
+    <p class="muted-note">勾「已收」記錄誰付了。金額為扣補助後的自付額。</p>
+    <div id="payList"></div>
+    <div id="paySummary" class="groupbanner" style="display:none;text-align:center;margin-top:8px"></div>
   </div>
 
   <!-- 團主開團（放最下面，一般人不用碰）-->
@@ -386,6 +402,7 @@ async function load(){
 }
 
 function render(rows){
+  renderPay(rows);
   $('cupTag').textContent = rows.length ? `共 ${rows.length} 杯` : '';
   const list=$('list');
   if(rows.length===0){ list.innerHTML='<div class="empty">還沒有人訂，當第一個吧！</div>'; }
@@ -436,6 +453,36 @@ function render(rows){
     head.appendChild(btn); wrap.appendChild(head);
     st.appendChild(wrap);
   });
+}
+
+// 💰 收錢清單：依人加總自付額，可勾「已收」（整批標記該人所有訂單）
+function renderPay(rows){
+  const card=$('payCard'), listEl=$('payList'), sumEl=$('paySummary');
+  if(rows.length===0){ card.style.display='none'; return; }
+  card.style.display='';
+  const byPerson={};
+  rows.forEach(r=>{ (byPerson[r.person]=byPerson[r.person]||[]).push(r); });
+  listEl.innerHTML='';
+  let owed=0, got=0, unpaidPeople=0;
+  Object.entries(byPerson).forEach(([person,list])=>{
+    const amt=list.reduce((s,r)=>s+selfPay(r.price||0, r.subsidy||0),0);
+    const allPaid=list.every(r=>r.paid);
+    owed+=amt; if(allPaid) got+=amt; else if(amt>0) unpaidPeople++;
+    const items=list.map(r=>r.item).join('、');
+    const row=document.createElement('div'); row.className='payrow'+(allPaid?' done':'');
+    row.innerHTML=`<div class="pn">${person} <small>${list.length>1?list.length+'杯・':''}${items}</small></div>`+
+      `<div class="pa">$${amt}</div>`;
+    const lab=document.createElement('label');
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=allPaid;
+    cb.onchange=async()=>{ const ids=list.map(r=>r.id);
+      const {error}=await sb.from('drink_orders').update({paid:cb.checked}).in('id',ids);
+      if(error){ toast('更新失敗：'+error.message); cb.checked=!cb.checked; return; } load(); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode('已收'));
+    row.appendChild(lab); listEl.appendChild(row);
+  });
+  $('payTag').textContent=`應收 $${owed}`;
+  if(unpaidPeople>0){ sumEl.style.display=''; sumEl.innerHTML=`已收 <b>$${got}</b>　・　還差 <b>$${owed-got}</b>（${unpaidPeople} 人未付）`; }
+  else { sumEl.style.display=''; sumEl.innerHTML=`✅ 全部收齊　<b>$${owed}</b>`; }
 }
 
 // 把某店訂單彙整成可貼給店家的文字（按 品項+容量+甜度+冰塊 加總）
@@ -495,12 +542,13 @@ function renderTeamPicker(){
   wrap.style.display=''; el.innerHTML='';
   sessions.forEach(s=>{
     const c=document.createElement('button'); c.className='chip'+(session&&s.id===session.id?' on':'');
-    c.textContent=(s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s);
+    c.textContent=(s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s)+(s.closed?' ✅已結單':'');
     c.onclick=()=>{ session=s; sel.item=null; el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); applySession(); };
     el.appendChild(c);
   });
 }
 function applySession(){
+  $('closedMsg').style.display='none';
   if(!session){
     $('orderBody').style.display='none'; $('notOpen').style.display=''; $('groupBanner').style.display='none';
     load(); return;
@@ -522,12 +570,14 @@ function applySession(){
       + ((session.allowed_items||[]).length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
   }
   sel.toppings.clear(); buildToppings();
-  renderShops(); buildItems(); updateSubmit(); load();
+  renderShops(); buildItems(); updateSubmit();
+  if(session.closed){ $('orderBody').style.display='none'; $('closedMsg').style.display=''; }
+  load();
 }
 async function loadSessions(){
   const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
   sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
-    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||''
+    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', closed:!!s.closed
   }));
   if(TEAM_ID){
     // 一團一網址：鎖定該團、隱藏團主面板
@@ -564,13 +614,21 @@ function renderLeaderTeams(){
     const url=teamLink(s.id);
     const row=document.createElement('div'); row.className='teamrow';
     const name=document.createElement('div'); name.className='name';
-    name.innerHTML=`<span>${s.mode==='custom'?'🍱 ':'🧋 '}${teamLabel(s)}</span>`;
+    name.innerHTML=`<span>${s.mode==='custom'?'🍱 ':'🧋 '}${teamLabel(s)}${s.closed?' <small style="color:#2f6b3a;font-weight:700">✅已結單</small>':''}</span>`;
+    const btns=document.createElement('span'); btns.style.cssText='display:flex;gap:10px;align-items:center';
+    const lock=document.createElement('button'); lock.className='close'; lock.style.color=s.closed?'#2f6b3a':'#a9743f';
+    lock.textContent = s.closed ? '↺ 重新開單' : '🔒 結單';
+    lock.onclick=async()=>{
+      const {error}=await sb.from('drink_sessions').update({closed:!s.closed}).eq('id',s.id);
+      if(error){ toast('失敗：'+error.message); return; }
+      toast(s.closed?'已重新開單，可繼續點':'已結單，無法再點'); await loadSessions(); };
     const close=document.createElement('button'); close.className='close'; close.textContent='× 關閉';
     close.onclick=async()=>{ if(!confirm(`關閉「${teamLabel(s)}」這團？\n（已點的訂單會保留）`)) return;
       const {error}=await sb.from('drink_sessions').delete().eq('id',s.id);
       if(error){ toast('關閉失敗：'+error.message); return; }
       toast('已關閉這團'); await loadSessions(); };
-    name.appendChild(close);
+    btns.appendChild(lock); btns.appendChild(close);
+    name.appendChild(btns);
     const lr=document.createElement('div'); lr.className='linkrow';
     const u=document.createElement('div'); u.className='url'; u.textContent=url; u.title=url;
     const cp=document.createElement('button'); cp.className='copy'; cp.innerHTML=COPY_SVG; cp.title='複製連結';
