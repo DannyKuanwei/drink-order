@@ -31,6 +31,8 @@
   .dice:disabled { opacity:.55; cursor:not-allowed; border-style:solid; }
   .dice.rolling { animation:wiggle .4s; }
   @keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-4deg)} 75%{transform:rotate(4deg)} }
+  .cancelpick { margin-top:6px; width:100%; padding:8px; border:none; background:transparent; color:var(--muted); font-size:13px; cursor:pointer; font-family:inherit; text-decoration:underline; }
+  .cancelpick:active { color:var(--brand); }
   .submit { margin-top:16px; width:100%; padding:15px; border:none; border-radius:14px; background:var(--brand); color:#fff; font-size:17px; font-weight:800; letter-spacing:2px; cursor:pointer; font-family:inherit; }
   .submit:active { transform:scale(.98); }
   .submit:disabled { opacity:.45; }
@@ -73,6 +75,7 @@
     <label class="field">品項</label>
     <div class="items" id="items"></div>
     <button class="dice" id="dice">🎲 拿不定主意？幫我骰（剩 2 次）</button>
+    <button class="cancelpick" id="cancelpick">↩ 取消重選（清空目前選擇）</button>
 
     <label class="field">容量</label>
     <div class="chips" id="sizes"></div>
@@ -189,7 +192,7 @@ function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('sho
 const shopOf = id => SHOPS.find(s=>s.id===id);
 
 $('person').value = localStorage.getItem('drink_person') || '';
-$('person').addEventListener('input', e => { localStorage.setItem('drink_person', e.target.value.trim()); updateSubmit(); });
+$('person').addEventListener('input', e => { localStorage.setItem('drink_person', e.target.value.trim()); updateSubmit(); updateDice(); });
 
 // 店家 chips
 const shopsEl = $('shops');
@@ -295,26 +298,37 @@ function copyForShop(shop, list){
   navigator.clipboard.writeText(text).then(()=>toast('✓ 已複製，可貼給店家'),()=>{ prompt('複製這段給店家：', text); });
 }
 
-// ── 🎲 幫我骰（整天限 2 次、不得取消）──
-let diceUsed = parseInt(localStorage.getItem('dice_'+BATCH) || '0', 10);
+// ── 🎲 幫我骰（每人限 2 次；可取消重選，但取消不退骰子次數）──
+const diceKey = () => 'dice_'+BATCH+'_'+($('person').value.trim()||'_');
+const diceUsedNow = () => parseInt(localStorage.getItem(diceKey()) || '0', 10);
 function updateDice(){
-  const b=$('dice'), left=2-diceUsed;
-  if(left<=0){ b.disabled=true; b.textContent='🎲 骰子用完囉，就這杯吧！'; }
-  else { b.disabled=false; b.textContent=`🎲 拿不定主意？幫我骰（剩 ${left} 次）`; }
+  const b=$('dice'), name=$('person').value.trim();
+  if(!name){ b.disabled=true; b.textContent='🎲 請先填名字'; return; }
+  const left=2-diceUsedNow();
+  if(left<=0){ b.disabled=true; b.textContent='🎲 你的 2 次骰完囉，自己選或維持目前'; }
+  else { b.disabled=false; b.textContent=`🎲 拿不定主意？幫我骰（你還剩 ${left} 次）`; }
 }
 $('dice').onclick = () => {
-  if(diceUsed>=2) return;
+  const name=$('person').value.trim();
+  if(!name || diceUsedNow()>=2) return;
   const menu=shopOf(sel.shop).menu;
   sel.item = menu[Math.floor(Math.random()*menu.length)].name;
   sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
   sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
   sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
   pickItem(sel.item); pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice);
-  diceUsed++; localStorage.setItem('dice_'+BATCH, diceUsed);
+  localStorage.setItem(diceKey(), diceUsedNow()+1);
   const sizeLabel=SIZES.find(s=>s[1]===sel.sizeKey)[0];
   const b=$('dice'); b.classList.remove('rolling'); void b.offsetWidth; b.classList.add('rolling');
   toast(`🎲 骰到：${shopOf(sel.shop).name} ${sel.item}（${sizeLabel}・${sel.sugar}・${sel.ice}）`);
   updateDice(); updateSubmit();
+};
+// 取消重選：清空目前選擇（不退還骰子次數）
+$('cancelpick').onclick = () => {
+  sel.item=null; sel.sizeKey='m'; sel.sugar='半糖'; sel.ice='少冰';
+  pickItem(''); pickChip('sizes','m'); pickChip('sugars','半糖'); pickChip('ices','少冰');
+  $('topping').value='';
+  updateSubmit(); toast('已清空，可自己重選');
 };
 
 sb.channel('drink_orders_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_orders'},()=>load()).subscribe();
