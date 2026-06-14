@@ -26,6 +26,11 @@
   .item.on { border-color:var(--brand); background:#fbf1e7; }
   .item .nm { font-size:15px; font-weight:700; color:var(--ink); }
   .item .pr { font-size:12px; color:var(--muted); margin-top:3px; }
+  .dice { margin-top:10px; width:100%; padding:12px; border:1.5px dashed var(--brand2); background:#fff7ef; color:var(--brand); border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:.12s; }
+  .dice:active:not(:disabled) { transform:scale(.98); }
+  .dice:disabled { opacity:.55; cursor:not-allowed; border-style:solid; }
+  .dice.rolling { animation:wiggle .4s; }
+  @keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-4deg)} 75%{transform:rotate(4deg)} }
   .submit { margin-top:16px; width:100%; padding:15px; border:none; border-radius:14px; background:var(--brand); color:#fff; font-size:17px; font-weight:800; letter-spacing:2px; cursor:pointer; font-family:inherit; }
   .submit:active { transform:scale(.98); }
   .submit:disabled { opacity:.45; }
@@ -67,6 +72,7 @@
 
     <label class="field">品項</label>
     <div class="items" id="items"></div>
+    <button class="dice" id="dice">🎲 拿不定主意？幫我骰（剩 2 次）</button>
 
     <label class="field">容量</label>
     <div class="chips" id="sizes"></div>
@@ -207,9 +213,11 @@ buildItems();
 
 function buildChips(elId, list, getVal, getLabel, initVal, onPick){
   const el=$(elId);
-  list.forEach(v=>{ const c=document.createElement('button'); c.className='chip'+(getVal(v)===initVal?' on':''); c.textContent=getLabel(v);
-    c.onclick=()=>{ onPick(getVal(v)); el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); updateSubmit(); }; el.appendChild(c); });
+  list.forEach(v=>{ const val=getVal(v); const c=document.createElement('button'); c.className='chip'+(val===initVal?' on':''); c.textContent=getLabel(v); c.dataset.val=String(val);
+    c.onclick=()=>{ onPick(val); el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); updateSubmit(); }; el.appendChild(c); });
 }
+function pickChip(elId, val){ $(elId).querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', x.dataset.val===String(val))); }
+function pickItem(name){ $('items').querySelectorAll('.item').forEach(x=>x.classList.toggle('on', x.dataset.name===name)); }
 buildChips('sizes', SIZES, v=>v[1], v=>v[0], 'm', v=>sel.sizeKey=v);
 buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
 buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
@@ -287,8 +295,30 @@ function copyForShop(shop, list){
   navigator.clipboard.writeText(text).then(()=>toast('✓ 已複製，可貼給店家'),()=>{ prompt('複製這段給店家：', text); });
 }
 
+// ── 🎲 幫我骰（整天限 2 次、不得取消）──
+let diceUsed = parseInt(localStorage.getItem('dice_'+BATCH) || '0', 10);
+function updateDice(){
+  const b=$('dice'), left=2-diceUsed;
+  if(left<=0){ b.disabled=true; b.textContent='🎲 骰子用完囉，就這杯吧！'; }
+  else { b.disabled=false; b.textContent=`🎲 拿不定主意？幫我骰（剩 ${left} 次）`; }
+}
+$('dice').onclick = () => {
+  if(diceUsed>=2) return;
+  const menu=shopOf(sel.shop).menu;
+  sel.item = menu[Math.floor(Math.random()*menu.length)].name;
+  sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
+  sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
+  sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
+  pickItem(sel.item); pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice);
+  diceUsed++; localStorage.setItem('dice_'+BATCH, diceUsed);
+  const sizeLabel=SIZES.find(s=>s[1]===sel.sizeKey)[0];
+  const b=$('dice'); b.classList.remove('rolling'); void b.offsetWidth; b.classList.add('rolling');
+  toast(`🎲 骰到：${shopOf(sel.shop).name} ${sel.item}（${sizeLabel}・${sel.sugar}・${sel.ice}）`);
+  updateDice(); updateSubmit();
+};
+
 sb.channel('drink_orders_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_orders'},()=>load()).subscribe();
-load(); updateSubmit();
+load(); updateSubmit(); updateDice();
 </script>
 </body>
 </html>
