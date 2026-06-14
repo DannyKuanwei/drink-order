@@ -168,6 +168,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 const SUPA_URL = 'https://hhbgdfnnnfemqpzrjhnh.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoYmdkZm5ubmZlbXFwenJqaG5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjY1MDQsImV4cCI6MjA5MDYwMjUwNH0._eWQqiLd1baVS_bAdn0i5xa_gWOPby37lUTB17d1aHU';
@@ -547,6 +548,26 @@ $('saveSession').onclick = async ()=>{
 sb.channel('drink_orders_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_orders'},()=>load()).subscribe();
 sb.channel('drink_sessions_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_sessions'},()=>loadSession()).subscribe();
 updateSubmit(); updateDice(); loadSession();
+
+// ── LINE LIFF：在 LINE 內開啟時自動帶名字 ──
+const LIFF_ID='2010389802-gPyOd3rI';
+(async()=>{
+  try{
+    if(typeof liff==='undefined') return;          // SDK 沒載入（離線）→ 維持手動
+    await liff.init({ liffId: LIFF_ID });
+    if(liff.isLoggedIn()){
+      const p = await liff.getProfile();
+      if(p && p.displayName){
+        $('person').value = p.displayName;
+        localStorage.setItem('drink_person', p.displayName);
+        updateSubmit(); updateDice();
+      }
+    } else if(liff.isInClient()){
+      liff.login();                                 // 在 LINE 內但未登入 → 登入
+    }
+    // 一般瀏覽器（非 LINE）：不強制登入，維持手動輸入
+  }catch(e){ /* 初始化失敗就維持手動輸入 */ }
+})();
 </script>
 </body>
 </html>
