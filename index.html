@@ -44,6 +44,14 @@
   .leaderitems input { width:16px; height:16px; accent-color:var(--brand); }
   input[type=number] { width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; outline:none; font-family:inherit; }
   .subnote { font-size:12px; color:#2f6b3a; font-weight:700; }
+  .itemimg { width:100%; height:64px; object-fit:cover; border-radius:8px; margin-bottom:6px; display:block; }
+  .customrow { display:flex; gap:6px; align-items:center; margin-bottom:8px; }
+  .customrow input { width:auto; min-width:0; }
+  .customrow .cn { flex:2; }
+  .customrow .cp { flex:1; max-width:90px; }
+  .customrow .ph { width:46px; height:46px; border:1px dashed var(--line); border-radius:8px; cursor:pointer; background:#faf5ee; flex:none; display:flex; align-items:center; justify-content:center; font-size:18px; overflow:hidden; }
+  .customrow .ph img { width:100%; height:100%; object-fit:cover; }
+  .customrow .rm { border:none; background:#f6ece1; color:#c0563f; border-radius:8px; width:34px; height:34px; font-size:16px; cursor:pointer; flex:none; }
   .order { display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px dashed var(--line); }
   .order:last-child { border-bottom:none; }
   .order .who { font-weight:800; min-width:60px; }
@@ -78,14 +86,24 @@
       <label class="field">模式</label>
       <div class="chips" id="modeChips">
         <button class="chip" data-mode="open">自由模式（各自選店）</button>
-        <button class="chip" data-mode="group">團主開團（限定店家/品項/補助）</button>
+        <button class="chip" data-mode="group">團主開團（限定店家）</button>
+        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點）</button>
       </div>
       <div id="groupSettings" style="display:none">
         <label class="field">指定店家</label>
         <div class="chips shopchips" id="leaderShops"></div>
         <label class="field">開放品項（不勾＝全部開放）</label>
         <div class="leaderitems" id="leaderItems"></div>
-        <label class="field">每杯補助上限（公司付，超過自付；0＝不補助）</label>
+      </div>
+      <div id="customSettings" style="display:none">
+        <label class="field">這團的名稱（例如：今日便當、下午茶）</label>
+        <input type="text" id="customTitle" placeholder="輸入團名" autocomplete="off" />
+        <label class="field">自訂品項（名稱＋價格，可上傳照片）</label>
+        <div id="customRows"></div>
+        <button class="mini" id="addCustomRow" style="margin:8px 0 0">＋ 新增一項</button>
+      </div>
+      <div id="subsidyWrap" style="display:none">
+        <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
         <input type="number" id="subsidyInput" min="0" placeholder="例如 50" />
       </div>
       <button class="submit" id="saveSession" style="margin-top:14px">儲存 / 開團</button>
@@ -108,14 +126,16 @@
     <button class="dice" id="dice">🎲 拿不定主意？幫我骰（剩 2 次）</button>
     <button class="cancelpick" id="cancelpick">↩ 取消重選（清空目前選擇）</button>
 
-    <label class="field">容量</label>
-    <div class="chips" id="sizes"></div>
+    <div id="drinkOpts">
+      <label class="field">容量</label>
+      <div class="chips" id="sizes"></div>
 
-    <label class="field">甜度</label>
-    <div class="chips" id="sugars"></div>
+      <label class="field">甜度</label>
+      <div class="chips" id="sugars"></div>
 
-    <label class="field">冰塊</label>
-    <div class="chips" id="ices"></div>
+      <label class="field">冰塊</label>
+      <div class="chips" id="ices"></div>
+    </div>
 
     <label class="field">加料 / 備註（選填）</label>
     <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
@@ -219,12 +239,15 @@ const BATCH = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'
 document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 
 const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
-let session = { mode:'open', shop:null, allowed_items:[], subsidy:0 };  // 團設定
+let session = { mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:'' };  // 團設定
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 const shopOf = id => SHOPS.find(s=>s.id===id);
-// 目前可選的菜單（團主開團且有限定品項時，只回傳開放的）
+// 目前可選的菜單
 function availableMenu(){
+  if(session.mode==='custom'){
+    return (session.custom_items||[]).map(c=>({name:c.name, m:c.price, l:c.price, photo:c.photo||null, single:true}));
+  }
   let menu = shopOf(sel.shop).menu;
   if(session.mode==='group' && session.allowed_items.length>0){
     menu = menu.filter(d=>session.allowed_items.includes(d.name));
@@ -252,9 +275,10 @@ function buildItems(){
   const itemsEl = $('items'); itemsEl.innerHTML='';
   availableMenu().forEach(d => {
     const b = document.createElement('button'); b.className='item'; b.dataset.name=d.name;
-    const full=sel.sizeKey==='l'?d.l:d.m;
+    const priceTxt = d.single ? `$${d.m}` : `中 $${d.m}・大 $${d.l}`;
     const sub = session.subsidy>0 ? `<div class="subnote">自付約 $${Math.max(0,d.m-session.subsidy)}起</div>` : '';
-    b.innerHTML = `<div class="nm">${d.name}</div><div class="pr">中 $${d.m}・大 $${d.l}</div>${sub}`;
+    const img = d.photo ? `<img src="${d.photo}" class="itemimg" alt="">` : '';
+    b.innerHTML = `${img}<div class="nm">${d.name}</div><div class="pr">${priceTxt}</div>${sub}`;
     b.onclick = () => { sel.item=d.name; itemsEl.querySelectorAll('.item').forEach(x=>x.classList.toggle('on',x===b)); updateSubmit(); };
     itemsEl.appendChild(b);
   });
@@ -272,7 +296,7 @@ buildChips('sizes', SIZES, v=>v[1], v=>v[0], 'm', v=>sel.sizeKey=v);
 buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
 buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
 
-function priceOf(){ if(!sel.item) return 0; const d=shopOf(sel.shop).menu.find(x=>x.name===sel.item); return d?(sel.sizeKey==='l'?d.l:d.m):0; }
+function priceOf(){ if(!sel.item) return 0; const d=availableMenu().find(x=>x.name===sel.item); return d?(sel.sizeKey==='l'?d.l:d.m):0; }
 function selfPay(full){ return session.subsidy>0 ? Math.max(0, full-session.subsidy) : full; }
 function updateSubmit(){
   const ok = sel.item && $('person').value.trim();
@@ -286,8 +310,13 @@ function updateSubmit(){
 $('submit').onclick = async () => {
   const person=$('person').value.trim(); if(!person||!sel.item) return;
   $('submit').disabled=true;
-  const row = { batch:BATCH, shop:shopOf(sel.shop).name, person, item:sel.item,
-    size:SIZES.find(s=>s[1]===sel.sizeKey)[0], sugar:sel.sugar, ice:sel.ice,
+  const isCustom = session.mode==='custom';
+  const row = { batch:BATCH,
+    shop: isCustom ? (session.title||'自訂菜單') : shopOf(sel.shop).name,
+    person, item:sel.item,
+    size: isCustom ? null : SIZES.find(s=>s[1]===sel.sizeKey)[0],
+    sugar: isCustom ? null : sel.sugar,
+    ice: isCustom ? null : sel.ice,
     topping:$('topping').value.trim()||null, price:priceOf() };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
@@ -377,14 +406,18 @@ $('dice').onclick = () => {
   const menu=availableMenu();
   if(menu.length===0){ toast('目前沒有可骰的品項'); return; }
   sel.item = menu[Math.floor(Math.random()*menu.length)].name;
-  sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
-  sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
-  sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
-  pickItem(sel.item); pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice);
+  pickItem(sel.item);
+  let detail='';
+  if(session.mode!=='custom'){   // 餐點不骰容量/甜度/冰塊
+    sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
+    sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
+    sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
+    pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice);
+    detail=`（${SIZES.find(s=>s[1]===sel.sizeKey)[0]}・${sel.sugar}・${sel.ice}）`;
+  }
   localStorage.setItem(diceKey(), diceUsedNow()+1);
-  const sizeLabel=SIZES.find(s=>s[1]===sel.sizeKey)[0];
   const b=$('dice'); b.classList.remove('rolling'); void b.offsetWidth; b.classList.add('rolling');
-  toast(`🎲 骰到：${shopOf(sel.shop).name} ${sel.item}（${sizeLabel}・${sel.sugar}・${sel.ice}）`);
+  toast(`🎲 骰到：${sel.item}${detail}`);
   updateDice(); updateSubmit();
 };
 // 取消重選：清空目前選擇（不退還骰子次數）
@@ -400,41 +433,52 @@ function applySession(){
   if(session.mode==='group' && session.shop){
     const sid = SHOPS.find(s=>s.name===session.shop)?.id;
     if(sid && sel.shop!==sid){ sel.shop=sid; sel.item=null; }
-    $('shopArea').style.display='none';
+    $('shopArea').style.display='none'; $('drinkOpts').style.display='';
     const subTxt = session.subsidy>0 ? `　・　公司每杯補助 $${session.subsidy}，超過自付` : '';
     $('groupBanner').style.display='';
     $('groupBanner').innerHTML = `🧑‍💼 本團指定店家：<b>${session.shop}</b>${subTxt}`
       + (session.allowed_items.length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
+  } else if(session.mode==='custom'){
+    sel.item=null;
+    $('shopArea').style.display='none'; $('drinkOpts').style.display='none';   // 餐點不用容量/甜度/冰塊
+    const subTxt = session.subsidy>0 ? `　・　公司每份補助 $${session.subsidy}，超過自付` : '';
+    $('groupBanner').style.display='';
+    $('groupBanner').innerHTML = `🍱 自訂團：<b>${session.title||'自訂菜單'}</b>${subTxt}`;
   } else {
-    $('shopArea').style.display='';
-    $('groupBanner').style.display='none';
+    $('shopArea').style.display=''; $('drinkOpts').style.display=''; $('groupBanner').style.display='none';
   }
   renderShops(); buildItems(); updateSubmit(); load();
 }
 async function loadSession(){
   const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).maybeSingle();
-  session = data ? { mode:data.mode||'open', shop:data.shop||null, allowed_items:data.allowed_items||[], subsidy:data.subsidy||0 }
-                 : { mode:'open', shop:null, allowed_items:[], subsidy:0 };
+  session = data ? { mode:data.mode||'open', shop:data.shop||null, allowed_items:data.allowed_items||[], subsidy:data.subsidy||0, custom_items:data.custom_items||[], title:data.title||'' }
+                 : { mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:'' };
   applySession();
 }
 
 // ── 團主面板 ──
-const leader = { mode:'open', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0 };
+const leader = { mode:'open', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0, title:'', custom:[] };
 $('leaderToggle').onclick = ()=>{
   const p=$('leaderPanel'), show=p.style.display==='none';
   p.style.display=show?'':'none'; $('leaderToggle').textContent=show?'收合':'設定';
   if(show) syncLeaderFromSession();
 };
+function refreshLeaderSections(){
+  $('groupSettings').style.display = leader.mode==='group' ? '' : 'none';
+  $('customSettings').style.display = leader.mode==='custom' ? '' : 'none';
+  $('subsidyWrap').style.display = (leader.mode==='group'||leader.mode==='custom') ? '' : 'none';
+}
 function syncLeaderFromSession(){
   leader.mode=session.mode; leader.shopName=session.shop||SHOPS[0].name;
   leader.allowed=new Set(session.allowed_items||[]); leader.subsidy=session.subsidy||0;
-  $('subsidyInput').value=leader.subsidy||'';
+  leader.title=session.title||''; leader.custom=(session.custom_items||[]).map(c=>({...c}));
+  $('subsidyInput').value=leader.subsidy||''; $('customTitle').value=leader.title;
   $('modeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.mode===leader.mode));
-  $('groupSettings').style.display=leader.mode==='group'?'':'none';
-  renderLeaderShops(); renderLeaderItems();
+  refreshLeaderSections();
+  renderLeaderShops(); renderLeaderItems(); renderCustomRows();
 }
 $('modeChips').querySelectorAll('.chip').forEach(c=>{
-  c.onclick=()=>{ leader.mode=c.dataset.mode; $('modeChips').querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); $('groupSettings').style.display=leader.mode==='group'?'':'none'; };
+  c.onclick=()=>{ leader.mode=c.dataset.mode; $('modeChips').querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); refreshLeaderSections(); };
 });
 function renderLeaderShops(){
   const el=$('leaderShops'); el.innerHTML='';
@@ -452,14 +496,50 @@ function renderLeaderItems(){
     lab.appendChild(cb); lab.appendChild(document.createTextNode(' '+d.name)); el.appendChild(lab);
   });
 }
+// 自訂品項編輯
+function renderCustomRows(){
+  const el=$('customRows'); el.innerHTML='';
+  leader.custom.forEach((it,idx)=>{
+    const row=document.createElement('div'); row.className='customrow';
+    const ph=document.createElement('label'); ph.className='ph'; ph.innerHTML = it.photo ? `<img src="${it.photo}">` : '📷';
+    const file=document.createElement('input'); file.type='file'; file.accept='image/*'; file.style.display='none';
+    file.onchange=()=>uploadCustomPhoto(idx, file.files[0]); ph.appendChild(file);
+    const nm=document.createElement('input'); nm.type='text'; nm.className='cn'; nm.placeholder='品項名稱'; nm.value=it.name||'';
+    nm.oninput=()=>{ leader.custom[idx].name=nm.value; };
+    const pr=document.createElement('input'); pr.type='number'; pr.className='cp'; pr.min='0'; pr.placeholder='價格'; pr.value=it.price||'';
+    pr.oninput=()=>{ leader.custom[idx].price=parseInt(pr.value||'0',10)||0; };
+    const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×';
+    rm.onclick=()=>{ leader.custom.splice(idx,1); renderCustomRows(); };
+    row.appendChild(ph); row.appendChild(nm); row.appendChild(pr); row.appendChild(rm);
+    el.appendChild(row);
+  });
+}
+$('addCustomRow').onclick=()=>{ leader.custom.push({name:'',price:0,photo:null}); renderCustomRows(); };
+async function uploadCustomPhoto(idx, file){
+  if(!file) return;
+  toast('上傳照片中…');
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+  const path='items/'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+ext;
+  const { error } = await sb.storage.from('drink-photos').upload(path, file, { contentType:file.type });
+  if(error){ toast('上傳失敗：'+error.message); return; }
+  leader.custom[idx].photo = sb.storage.from('drink-photos').getPublicUrl(path).data.publicUrl;
+  renderCustomRows(); toast('✓ 照片已上傳');
+}
 $('saveSession').onclick = async ()=>{
   const subsidy=Math.max(0, parseInt($('subsidyInput').value||'0',10)||0);
-  const payload = leader.mode==='group'
-    ? { batch:BATCH, mode:'group', shop:leader.shopName, allowed_items:[...leader.allowed], subsidy, updated_at:new Date().toISOString() }
-    : { batch:BATCH, mode:'open', shop:null, allowed_items:[], subsidy:0, updated_at:new Date().toISOString() };
+  let payload;
+  if(leader.mode==='group'){
+    payload={ batch:BATCH, mode:'group', shop:leader.shopName, allowed_items:[...leader.allowed], subsidy, custom_items:[], title:null, updated_at:new Date().toISOString() };
+  } else if(leader.mode==='custom'){
+    const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0, photo:c.photo||null}));
+    if(items.length===0){ toast('請至少新增一個有名稱的品項'); return; }
+    payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單'), updated_at:new Date().toISOString() };
+  } else {
+    payload={ batch:BATCH, mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:null, updated_at:new Date().toISOString() };
+  }
   const { error } = await sb.from('drink_sessions').upsert(payload,{onConflict:'batch'});
   if(error){ toast('儲存失敗：'+error.message); return; }
-  toast(leader.mode==='group'?'✓ 已開團！所有人畫面已更新':'✓ 已改回自由模式');
+  toast(leader.mode==='open'?'✓ 已改回自由模式':'✓ 已開團！所有人畫面已更新');
   $('leaderPanel').style.display='none'; $('leaderToggle').textContent='設定';
   await loadSession();
 };
