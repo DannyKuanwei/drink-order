@@ -16,6 +16,10 @@
   .card h2 { margin:0 0 12px; font-size:16px; letter-spacing:1px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .lead { margin:0 0 14px; font-size:14px; color:var(--brand); font-weight:800; background:#fbf1e7; border-radius:10px; padding:10px 12px; text-align:center; }
   .muted-note { margin:0 0 2px; font-size:12px; color:var(--muted); line-height:1.6; }
+  .notopen { text-align:center; padding:28px 16px; color:var(--ink); font-size:17px; font-weight:800; line-height:1.9; }
+  .notopen span { font-size:13px; font-weight:400; color:var(--muted); }
+  .teamtag { display:inline-flex; align-items:center; gap:6px; background:#f3ece1; border:1px solid var(--line); border-radius:999px; padding:6px 8px 6px 12px; margin:0 6px 6px 0; font-size:13px; font-weight:700; color:var(--brand); }
+  .teamtag .x { border:none; background:#e7d8c6; color:#9a4b35; border-radius:50%; width:20px; height:20px; font-size:13px; cursor:pointer; line-height:1; }
   label.field { display:block; font-size:12px; color:var(--muted); margin:12px 0 6px; font-weight:700; letter-spacing:1px; }
   input[type=text] { width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; outline:none; font-family:inherit; }
   input[type=text]:focus { border-color:var(--brand2); }
@@ -82,36 +86,42 @@
   </header>
 
   <div class="card">
-    <div class="groupbanner" id="groupBanner" style="display:none"></div>
-    <p class="lead">填名字 → 選餐點 → 按送出，大家即時看到 👇</p>
-    <label class="field">你的名字</label>
-    <input type="text" id="person" placeholder="輸入姓名（會記住）" autocomplete="off" />
-
-    <div id="shopArea">
-      <label class="field">選店家</label>
-      <div class="chips shopchips" id="shops"></div>
+    <div id="teamPickerWrap" style="display:none">
+      <label class="field">選擇要訂哪一團</label>
+      <div class="chips" id="teamPicker"></div>
     </div>
+    <div id="notOpen" class="notopen" style="display:none">🔒 目前尚未開團<br><span>請等團主在最下方開團後再點餐</span></div>
+    <div id="orderBody">
+      <div class="groupbanner" id="groupBanner" style="display:none"></div>
+      <p class="lead">填名字 → 選餐點 → 按送出，大家即時看到 👇</p>
+      <label class="field">你的名字</label>
+      <input type="text" id="person" placeholder="輸入姓名（會記住）" autocomplete="off" />
 
-    <label class="field">品項</label>
-    <div class="items" id="items"></div>
-    <button class="dice" id="dice">🎲 拿不定主意？幫我骰（剩 2 次）</button>
-    <button class="cancelpick" id="cancelpick">↩ 取消重選（清空目前選擇）</button>
+      <div id="shopArea" style="display:none">
+        <div class="chips shopchips" id="shops"></div>
+      </div>
 
-    <div id="drinkOpts">
-      <label class="field">容量</label>
-      <div class="chips" id="sizes"></div>
+      <label class="field">品項</label>
+      <div class="items" id="items"></div>
+      <button class="dice" id="dice">🎲 拿不定主意？幫我骰（剩 2 次）</button>
+      <button class="cancelpick" id="cancelpick">↩ 取消重選（清空目前選擇）</button>
 
-      <label class="field">甜度</label>
-      <div class="chips" id="sugars"></div>
+      <div id="drinkOpts">
+        <label class="field">容量</label>
+        <div class="chips" id="sizes"></div>
 
-      <label class="field">冰塊</label>
-      <div class="chips" id="ices"></div>
+        <label class="field">甜度</label>
+        <div class="chips" id="sugars"></div>
+
+        <label class="field">冰塊</label>
+        <div class="chips" id="ices"></div>
+      </div>
+
+      <label class="field">加料 / 備註（選填）</label>
+      <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
+
+      <button class="submit" id="submit" disabled>請先選品項</button>
     </div>
-
-    <label class="field">加料 / 備註（選填）</label>
-    <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
-
-    <button class="submit" id="submit" disabled>請先選店家與品項</button>
   </div>
 
   <div class="card">
@@ -135,11 +145,13 @@
     <h2>🧑‍💼 團主開團 / 模式設定 <button class="mini" id="leaderToggle">展開</button></h2>
     <p class="muted-note">一般人只要在上面點餐即可。團主才需要這裡：限定店家、自訂菜單、設補助。</p>
     <div id="leaderPanel" style="display:none">
-      <label class="field">模式</label>
+      <label class="field">今日已開的團（按 × 可關閉）</label>
+      <div id="leaderTeams"></div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:16px 0" />
+      <label class="field">開新團 — 選模式</label>
       <div class="chips" id="modeChips">
-        <button class="chip" data-mode="open">自由模式（各自選店）</button>
-        <button class="chip" data-mode="group">團主開團（限定店家）</button>
-        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點）</button>
+        <button class="chip" data-mode="group">限定店家（從 7 間飲料店選一間）</button>
+        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點/便當）</button>
       </div>
       <div id="groupSettings" style="display:none">
         <label class="field">指定店家</label>
@@ -158,7 +170,7 @@
         <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
         <input type="number" id="subsidyInput" min="0" placeholder="例如 50" />
       </div>
-      <button class="submit" id="saveSession" style="margin-top:14px">儲存 / 開團</button>
+      <button class="submit" id="saveSession" style="margin-top:14px">＋ 開這團</button>
     </div>
   </div>
 
@@ -241,17 +253,19 @@ const BATCH = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'
 document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 
 const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
-let session = { mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:'' };  // 團設定
+let sessions = [];     // 今日所有團
+let session = null;    // 目前選的團（active）
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 const shopOf = id => SHOPS.find(s=>s.id===id);
-// 目前可選的菜單
+// 目前可選的菜單（依目前選的團）
 function availableMenu(){
+  if(!session) return [];
   if(session.mode==='custom'){
     return (session.custom_items||[]).map(c=>({name:c.name, m:c.price, l:c.price, photo:c.photo||null, single:true}));
   }
   let menu = shopOf(sel.shop).menu;
-  if(session.mode==='group' && session.allowed_items.length>0){
+  if(session.mode==='group' && (session.allowed_items||[]).length>0){
     menu = menu.filter(d=>session.allowed_items.includes(d.name));
   }
   return menu;
@@ -277,8 +291,9 @@ function buildItems(){
   const itemsEl = $('items'); itemsEl.innerHTML='';
   availableMenu().forEach(d => {
     const b = document.createElement('button'); b.className='item'; b.dataset.name=d.name;
+    const subsidy = session ? (session.subsidy||0) : 0;
     const priceTxt = d.single ? `$${d.m}` : `中 $${d.m}・大 $${d.l}`;
-    const sub = session.subsidy>0 ? `<div class="subnote">自付約 $${Math.max(0,d.m-session.subsidy)}起</div>` : '';
+    const sub = subsidy>0 ? `<div class="subnote">自付約 $${Math.max(0,d.m-subsidy)}起</div>` : '';
     const img = d.photo ? `<img src="${d.photo}" class="itemimg" alt="">` : '';
     b.innerHTML = `${img}<div class="nm">${d.name}</div><div class="pr">${priceTxt}</div>${sub}`;
     b.onclick = () => { sel.item=d.name; itemsEl.querySelectorAll('.item').forEach(x=>x.classList.toggle('on',x===b)); updateSubmit(); };
@@ -299,27 +314,28 @@ buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
 buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
 
 function priceOf(){ if(!sel.item) return 0; const d=availableMenu().find(x=>x.name===sel.item); return d?(sel.sizeKey==='l'?d.l:d.m):0; }
-function selfPay(full){ return session.subsidy>0 ? Math.max(0, full-session.subsidy) : full; }
+function selfPay(full, sub){ return sub>0 ? Math.max(0, full-sub) : full; }
 function updateSubmit(){
-  const ok = sel.item && $('person').value.trim();
+  const ok = session && sel.item && $('person').value.trim();
   const btn=$('submit'); btn.disabled=!ok;
   if(!$('person').value.trim()){ btn.textContent='請先填名字'; return; }
   if(!sel.item){ btn.textContent='請先選品項'; return; }
-  const full=priceOf();
-  btn.textContent = session.subsidy>0 ? `送出　自付 $${selfPay(full)}（原價 $${full}）` : `送出　$${full}`;
+  const full=priceOf(), sub=session?(session.subsidy||0):0;
+  btn.textContent = sub>0 ? `送出　自付 $${selfPay(full,sub)}（原價 $${full}）` : `送出　$${full}`;
 }
 
 $('submit').onclick = async () => {
-  const person=$('person').value.trim(); if(!person||!sel.item) return;
+  const person=$('person').value.trim(); if(!person||!sel.item||!session) return;
   $('submit').disabled=true;
   const isCustom = session.mode==='custom';
   const row = { batch:BATCH,
-    shop: isCustom ? (session.title||'自訂菜單') : shopOf(sel.shop).name,
+    shop: isCustom ? (session.title||'自訂菜單') : session.shop,
     person, item:sel.item,
     size: isCustom ? null : SIZES.find(s=>s[1]===sel.sizeKey)[0],
     sugar: isCustom ? null : sel.sugar,
     ice: isCustom ? null : sel.ice,
-    topping:$('topping').value.trim()||null, price:priceOf() };
+    topping:$('topping').value.trim()||null, price:priceOf(),
+    subsidy: session.subsidy||0 };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
   $('topping').value=''; toast('✓ 已送出！'); load();
@@ -339,8 +355,9 @@ function render(rows){
     rows.forEach(r=>{
       const div=document.createElement('div'); div.className='order';
       const opts=[r.size,r.sugar,r.ice].filter(Boolean).join('・');
-      const self = selfPay(r.price||0);
-      const priceHtml = session.subsidy>0
+      const sub=r.subsidy||0;
+      const self = selfPay(r.price||0, sub);
+      const priceHtml = sub>0
         ? `<div class="pr">$${self}<br><span style="font-size:10px;color:var(--muted);font-weight:400">原$${r.price}</span></div>`
         : `<div class="pr">$${r.price}</div>`;
       div.innerHTML =
@@ -358,10 +375,11 @@ function render(rows){
   $('totPeople').textContent=new Set(rows.map(r=>r.person)).size;
   // 補助統計
   const subBox=$('subsidyTally');
-  if(session.subsidy>0 && rows.length>0){
-    const totSelf=rows.reduce((s,r)=>s+selfPay(r.price||0),0);
+  const anySub = rows.some(r=>(r.subsidy||0)>0);
+  if(anySub && rows.length>0){
+    const totSelf=rows.reduce((s,r)=>s+selfPay(r.price||0, r.subsidy||0),0);
     subBox.style.display='';
-    subBox.innerHTML=`公司補助合計 <b>$${totFull-totSelf}</b>　・　員工自付合計 <b>$${totSelf}</b>（每杯補助上限 $${session.subsidy}）`;
+    subBox.innerHTML=`公司補助合計 <b>$${totFull-totSelf}</b>　・　員工自付合計 <b>$${totSelf}</b>`;
   } else { subBox.style.display='none'; }
 
   // 依店家分組 + 複製給店家
@@ -410,7 +428,7 @@ $('dice').onclick = () => {
   sel.item = menu[Math.floor(Math.random()*menu.length)].name;
   pickItem(sel.item);
   let detail='';
-  if(session.mode!=='custom'){   // 餐點不骰容量/甜度/冰塊
+  if(session && session.mode!=='custom'){   // 餐點不骰容量/甜度/冰塊
     sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
     sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
     sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
@@ -430,51 +448,84 @@ $('cancelpick').onclick = () => {
   updateSubmit(); toast('已清空，可自己重選');
 };
 
-// ── 團設定：載入 / 套用 ──
+// ── 多團：載入 / 選團 / 套用 ──
+function teamLabel(s){ return s.mode==='custom' ? (s.title||'自訂菜單') : s.shop; }
+function renderTeamPicker(){
+  const wrap=$('teamPickerWrap'), el=$('teamPicker');
+  if(sessions.length===0){ wrap.style.display='none'; el.innerHTML=''; return; }
+  wrap.style.display=''; el.innerHTML='';
+  sessions.forEach(s=>{
+    const c=document.createElement('button'); c.className='chip'+(session&&s.id===session.id?' on':'');
+    c.textContent=(s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s);
+    c.onclick=()=>{ session=s; sel.item=null; el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); applySession(); };
+    el.appendChild(c);
+  });
+}
 function applySession(){
-  if(session.mode==='group' && session.shop){
+  if(!session){
+    $('orderBody').style.display='none'; $('notOpen').style.display=''; $('groupBanner').style.display='none';
+    load(); return;
+  }
+  $('notOpen').style.display='none'; $('orderBody').style.display='';
+  if(session.mode==='custom'){
+    sel.item=null;
+    $('shopArea').style.display='none'; $('drinkOpts').style.display='none';   // 餐點不用容量/甜度/冰塊
+    const subTxt = session.subsidy>0 ? `　・　公司每份補助 $${session.subsidy}，超過自付` : '';
+    $('groupBanner').style.display='';
+    $('groupBanner').innerHTML = `🍱 <b>${session.title||'自訂菜單'}</b>${subTxt}`;
+  } else {
     const sid = SHOPS.find(s=>s.name===session.shop)?.id;
     if(sid && sel.shop!==sid){ sel.shop=sid; sel.item=null; }
     $('shopArea').style.display='none'; $('drinkOpts').style.display='';
     const subTxt = session.subsidy>0 ? `　・　公司每杯補助 $${session.subsidy}，超過自付` : '';
     $('groupBanner').style.display='';
-    $('groupBanner').innerHTML = `🧑‍💼 本團指定店家：<b>${session.shop}</b>${subTxt}`
-      + (session.allowed_items.length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
-  } else if(session.mode==='custom'){
-    sel.item=null;
-    $('shopArea').style.display='none'; $('drinkOpts').style.display='none';   // 餐點不用容量/甜度/冰塊
-    const subTxt = session.subsidy>0 ? `　・　公司每份補助 $${session.subsidy}，超過自付` : '';
-    $('groupBanner').style.display='';
-    $('groupBanner').innerHTML = `🍱 自訂團：<b>${session.title||'自訂菜單'}</b>${subTxt}`;
-  } else {
-    $('shopArea').style.display=''; $('drinkOpts').style.display=''; $('groupBanner').style.display='none';
+    $('groupBanner').innerHTML = `🧋 指定店家：<b>${session.shop}</b>${subTxt}`
+      + ((session.allowed_items||[]).length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
   }
   renderShops(); buildItems(); updateSubmit(); load();
 }
-async function loadSession(){
-  const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).maybeSingle();
-  session = data ? { mode:data.mode||'open', shop:data.shop||null, allowed_items:data.allowed_items||[], subsidy:data.subsidy||0, custom_items:data.custom_items||[], title:data.title||'' }
-                 : { mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:'' };
-  applySession();
+async function loadSessions(){
+  const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
+  sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
+    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||''
+  }));
+  const keep = session && session.id;
+  session = sessions.find(s=>s.id===keep) || sessions[0] || null;
+  renderTeamPicker(); renderLeaderTeams(); applySession();
 }
 
-// ── 團主面板 ──
-const leader = { mode:'open', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0, title:'', custom:[] };
+// ── 團主面板（可開多個團）──
+const leader = { mode:'group', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0, title:'', custom:[] };
 $('leaderToggle').onclick = ()=>{
   const p=$('leaderPanel'), show=p.style.display==='none';
-  p.style.display=show?'':'none'; $('leaderToggle').textContent=show?'收合':'設定';
-  if(show) syncLeaderFromSession();
+  p.style.display=show?'':'none'; $('leaderToggle').textContent=show?'收合':'展開';
+  if(show){ resetEditor(); renderLeaderTeams(); }
 };
 function refreshLeaderSections(){
   $('groupSettings').style.display = leader.mode==='group' ? '' : 'none';
   $('customSettings').style.display = leader.mode==='custom' ? '' : 'none';
   $('subsidyWrap').style.display = (leader.mode==='group'||leader.mode==='custom') ? '' : 'none';
 }
-function syncLeaderFromSession(){
-  leader.mode=session.mode; leader.shopName=session.shop||SHOPS[0].name;
-  leader.allowed=new Set(session.allowed_items||[]); leader.subsidy=session.subsidy||0;
-  leader.title=session.title||''; leader.custom=(session.custom_items||[]).map(c=>({...c}));
-  $('subsidyInput').value=leader.subsidy||''; $('customTitle').value=leader.title;
+// 今日已開的團清單（可關閉）
+function renderLeaderTeams(){
+  const el=$('leaderTeams'); if(!el) return; el.innerHTML='';
+  if(sessions.length===0){ el.innerHTML='<span class="muted-note">尚未開團</span>'; return; }
+  sessions.forEach(s=>{
+    const tag=document.createElement('span'); tag.className='teamtag';
+    tag.appendChild(document.createTextNode((s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s)));
+    const x=document.createElement('button'); x.className='x'; x.textContent='×';
+    x.onclick=async()=>{ if(!confirm(`關閉「${teamLabel(s)}」這團？\n（已點的訂單會保留）`)) return;
+      const {error}=await sb.from('drink_sessions').delete().eq('id',s.id);
+      if(error){ toast('關閉失敗：'+error.message); return; }
+      toast('已關閉這團'); await loadSessions(); };
+    tag.appendChild(x); el.appendChild(tag);
+  });
+}
+// 重置「開新團」編輯器
+function resetEditor(){
+  leader.mode='group'; leader.shopName=SHOPS[0].name; leader.allowed=new Set();
+  leader.subsidy=0; leader.title=''; leader.custom=[];
+  $('subsidyInput').value=''; $('customTitle').value='';
   $('modeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.mode===leader.mode));
   refreshLeaderSections();
   renderLeaderShops(); renderLeaderItems(); renderCustomRows();
@@ -531,24 +582,22 @@ $('saveSession').onclick = async ()=>{
   const subsidy=Math.max(0, parseInt($('subsidyInput').value||'0',10)||0);
   let payload;
   if(leader.mode==='group'){
-    payload={ batch:BATCH, mode:'group', shop:leader.shopName, allowed_items:[...leader.allowed], subsidy, custom_items:[], title:null, updated_at:new Date().toISOString() };
-  } else if(leader.mode==='custom'){
+    payload={ batch:BATCH, mode:'group', shop:leader.shopName, allowed_items:[...leader.allowed], subsidy, custom_items:[], title:null };
+  } else {
     const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0, photo:c.photo||null}));
     if(items.length===0){ toast('請至少新增一個有名稱的品項'); return; }
-    payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單'), updated_at:new Date().toISOString() };
-  } else {
-    payload={ batch:BATCH, mode:'open', shop:null, allowed_items:[], subsidy:0, custom_items:[], title:null, updated_at:new Date().toISOString() };
+    payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單') };
   }
-  const { error } = await sb.from('drink_sessions').upsert(payload,{onConflict:'batch'});
-  if(error){ toast('儲存失敗：'+error.message); return; }
-  toast(leader.mode==='open'?'✓ 已改回自由模式':'✓ 已開團！所有人畫面已更新');
-  $('leaderPanel').style.display='none'; $('leaderToggle').textContent='設定';
-  await loadSession();
+  const { error } = await sb.from('drink_sessions').insert(payload);
+  if(error){ toast('開團失敗：'+error.message); return; }
+  toast('✓ 已開團！所有人畫面已更新');
+  resetEditor();
+  await loadSessions();
 };
 
 sb.channel('drink_orders_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_orders'},()=>load()).subscribe();
-sb.channel('drink_sessions_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_sessions'},()=>loadSession()).subscribe();
-updateSubmit(); updateDice(); loadSession();
+sb.channel('drink_sessions_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_sessions'},()=>loadSessions()).subscribe();
+updateSubmit(); updateDice(); loadSessions();
 
 // ── LINE LIFF：在 LINE 內開啟時自動帶名字 ──
 const LIFF_ID='2010389802-gPyOd3rI';
