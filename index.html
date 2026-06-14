@@ -591,7 +591,7 @@ $('lastBtn').onclick = () => {
 function teamLabel(s){ return s.mode==='custom' ? (s.title||'自訂菜單') : s.shop; }
 function renderTeamPicker(){
   const wrap=$('teamPickerWrap'), el=$('teamPicker');
-  if(TEAM_ID || sessions.length===0){ wrap.style.display='none'; el.innerHTML=''; return; }  // 單團網址不顯示選團
+  if(TEAM_ID || sessions.length<=1){ wrap.style.display='none'; el.innerHTML=''; return; }  // 單團網址或只有一團時不顯示選團（橫幅已顯示）
   wrap.style.display=''; el.innerHTML='';
   sessions.forEach(s=>{
     const on=session&&s.id===session.id;
