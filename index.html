@@ -202,7 +202,7 @@
         <div id="customRows"></div>
         <button class="mini" id="addCustomRow" style="margin:8px 0 0">＋ 新增一項</button>
       </div>
-      <div id="subsidyWrap" style="display:none">
+      <div id="subsidyWrap">
         <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
         <input type="number" id="subsidyInput" min="0" placeholder="例如 50" />
       </div>
@@ -674,7 +674,7 @@ $('leaderToggle').onclick = ()=>{
 function refreshLeaderSections(){
   $('groupSettings').style.display = leader.mode==='group' ? '' : 'none';
   $('customSettings').style.display = leader.mode==='custom' ? '' : 'none';
-  $('subsidyWrap').style.display = (leader.mode==='group'||leader.mode==='custom') ? '' : 'none';
+  $('subsidyWrap').style.display = '';  // 兩種模式都需要補助欄，永遠顯示
 }
 // 今日已開的團清單（可關閉）
 function renderLeaderTeams(){
