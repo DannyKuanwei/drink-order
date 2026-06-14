@@ -223,6 +223,14 @@ let session = { mode:'open', shop:null, allowed_items:[], subsidy:0 };  // 團�
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 const shopOf = id => SHOPS.find(s=>s.id===id);
+// 目前可選的菜單（團主開團且有限定品項時，只回傳開放的）
+function availableMenu(){
+  let menu = shopOf(sel.shop).menu;
+  if(session.mode==='group' && session.allowed_items.length>0){
+    menu = menu.filter(d=>session.allowed_items.includes(d.name));
+  }
+  return menu;
+}
 
 $('person').value = localStorage.getItem('drink_person') || '';
 $('person').addEventListener('input', e => { localStorage.setItem('drink_person', e.target.value.trim()); updateSubmit(); updateDice(); });
@@ -242,11 +250,7 @@ renderShops();
 // 品項（依選定店家；團主開團且有限定品項時只顯示開放的）
 function buildItems(){
   const itemsEl = $('items'); itemsEl.innerHTML='';
-  let menu = shopOf(sel.shop).menu;
-  if(session.mode==='group' && session.allowed_items.length>0){
-    menu = menu.filter(d=>session.allowed_items.includes(d.name));
-  }
-  menu.forEach(d => {
+  availableMenu().forEach(d => {
     const b = document.createElement('button'); b.className='item'; b.dataset.name=d.name;
     const full=sel.sizeKey==='l'?d.l:d.m;
     const sub = session.subsidy>0 ? `<div class="subnote">自付約 $${Math.max(0,d.m-session.subsidy)}起</div>` : '';
@@ -370,7 +374,8 @@ function updateDice(){
 $('dice').onclick = () => {
   const name=$('person').value.trim();
   if(!name || diceUsedNow()>=2) return;
-  const menu=shopOf(sel.shop).menu;
+  const menu=availableMenu();
+  if(menu.length===0){ toast('目前沒有可骰的品項'); return; }
   sel.item = menu[Math.floor(Math.random()*menu.length)].name;
   sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
   sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
