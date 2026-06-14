@@ -20,6 +20,13 @@
   .notopen span { font-size:13px; font-weight:400; color:var(--muted); }
   .teamtag { display:inline-flex; align-items:center; gap:6px; background:#f3ece1; border:1px solid var(--line); border-radius:999px; padding:6px 8px 6px 12px; margin:0 6px 6px 0; font-size:13px; font-weight:700; color:var(--brand); }
   .teamtag .x { border:none; background:#e7d8c6; color:#9a4b35; border-radius:50%; width:20px; height:20px; font-size:13px; cursor:pointer; line-height:1; }
+  .teamrow { border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:10px; }
+  .teamrow .name { font-weight:800; color:var(--brand); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .teamrow .name .close { border:none; background:transparent; color:#c0563f; font-size:13px; font-weight:700; cursor:pointer; }
+  .teamrow .linkrow { display:flex; gap:8px; align-items:center; }
+  .teamrow .url { flex:1; min-width:0; font-size:12px; color:var(--muted); background:#faf5ee; border:1px solid var(--line); border-radius:9px; padding:8px 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .teamrow .copy { flex:none; border:1px solid var(--brand); background:#fff; color:var(--brand); border-radius:9px; width:44px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.12s; }
+  .teamrow .copy.done { background:var(--brand); color:#fff; }
   label.field { display:block; font-size:12px; color:var(--muted); margin:12px 0 6px; font-weight:700; letter-spacing:1px; }
   input[type=text] { width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; outline:none; font-family:inherit; }
   input[type=text]:focus { border-color:var(--brand2); }
@@ -526,17 +533,24 @@ function renderLeaderTeams(){
   const el=$('leaderTeams'), card=$('teamsCard'); if(!el) return; el.innerHTML='';
   if(TEAM_ID || sessions.length===0){ if(card) card.style.display='none'; return; }   // 單團網址不顯示
   if(card) card.style.display='';
+  const COPY_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   sessions.forEach(s=>{
-    const tag=document.createElement('span'); tag.className='teamtag';
-    tag.appendChild(document.createTextNode((s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s)));
-    const lk=document.createElement('button'); lk.className='x'; lk.textContent='🔗'; lk.title='複製這團的連結';
-    lk.onclick=()=>{ const url=teamLink(s.id); navigator.clipboard.writeText(url).then(()=>toast('✓ 已複製連結，可貼到群組'),()=>prompt('複製這團的連結：',url)); };
-    const x=document.createElement('button'); x.className='x'; x.textContent='×'; x.title='關閉這團';
-    x.onclick=async()=>{ if(!confirm(`關閉「${teamLabel(s)}」這團？\n（已點的訂單會保留）`)) return;
+    const url=teamLink(s.id);
+    const row=document.createElement('div'); row.className='teamrow';
+    const name=document.createElement('div'); name.className='name';
+    name.innerHTML=`<span>${s.mode==='custom'?'🍱 ':'🧋 '}${teamLabel(s)}</span>`;
+    const close=document.createElement('button'); close.className='close'; close.textContent='× 關閉';
+    close.onclick=async()=>{ if(!confirm(`關閉「${teamLabel(s)}」這團？\n（已點的訂單會保留）`)) return;
       const {error}=await sb.from('drink_sessions').delete().eq('id',s.id);
       if(error){ toast('關閉失敗：'+error.message); return; }
       toast('已關閉這團'); await loadSessions(); };
-    tag.appendChild(lk); tag.appendChild(x); el.appendChild(tag);
+    name.appendChild(close);
+    const lr=document.createElement('div'); lr.className='linkrow';
+    const u=document.createElement('div'); u.className='url'; u.textContent=url; u.title=url;
+    const cp=document.createElement('button'); cp.className='copy'; cp.innerHTML=COPY_SVG; cp.title='複製連結';
+    cp.onclick=()=>{ navigator.clipboard.writeText(url).then(()=>{ toast('✓ 已複製連結'); cp.classList.add('done'); setTimeout(()=>cp.classList.remove('done'),1200); },()=>prompt('複製連結：',url)); };
+    lr.appendChild(u); lr.appendChild(cp);
+    row.appendChild(name); row.appendChild(lr); el.appendChild(row);
   });
 }
 // 重置「開新團」編輯器
