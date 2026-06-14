@@ -128,10 +128,13 @@
 
         <label class="field">冰塊</label>
         <div class="chips" id="ices"></div>
+
+        <label class="field">加料（可複選，每項加價）</label>
+        <div class="chips" id="toppings"></div>
       </div>
 
-      <label class="field">加料 / 備註（選填）</label>
-      <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
+      <label class="field">備註（選填）</label>
+      <input type="text" id="topping" placeholder="例如：換燕麥奶、少冰一點…" autocomplete="off" />
 
       <button class="submit" id="submit" disabled>請先選品項</button>
     </div>
@@ -258,11 +261,16 @@ const SHOPS = [
 const SUGARS = ['正常','少糖','半糖','微糖','無糖'];
 const ICES   = ['正常冰','少冰','微冰','去冰','熱'];
 const SIZES  = [['中杯','m'],['大杯','l']];
+// 加料（每項加價，價格可調）
+const TOPPINGS = [
+  {name:'珍珠', price:10}, {name:'波霸', price:10}, {name:'椰果', price:10},
+  {name:'布丁', price:10}, {name:'仙草凍', price:10}, {name:'燕麥', price:10},
+];
 
 const BATCH = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'})).toLocaleDateString('en-CA');
 document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 
-const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
+const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰', toppings:new Set() };
 let sessions = [];     // 今日所有團
 let session = null;    // 目前選的團（active）
 const TEAM_ID = new URLSearchParams(location.search).get('team');  // 一團一網址：?team=<id>
@@ -325,7 +333,21 @@ buildChips('sizes', SIZES, v=>v[1], v=>v[0], 'm', v=>sel.sizeKey=v);
 buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
 buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
 
-function priceOf(){ if(!sel.item) return 0; const d=availableMenu().find(x=>x.name===sel.item); return d?(sel.sizeKey==='l'?d.l:d.m):0; }
+// 加料 chips（可複選，每項加價）
+function buildToppings(){
+  const el=$('toppings'); el.innerHTML='';
+  TOPPINGS.forEach(t=>{
+    const c=document.createElement('button'); c.className='chip'+(sel.toppings.has(t.name)?' on':'');
+    c.textContent=`${t.name} +$${t.price}`;
+    c.onclick=()=>{ if(sel.toppings.has(t.name)) sel.toppings.delete(t.name); else sel.toppings.add(t.name);
+      c.classList.toggle('on', sel.toppings.has(t.name)); updateSubmit(); };
+    el.appendChild(c);
+  });
+}
+buildToppings();
+function toppingCost(){ return [...sel.toppings].reduce((s,n)=>{ const t=TOPPINGS.find(x=>x.name===n); return s+(t?t.price:0); },0); }
+
+function priceOf(){ if(!sel.item) return 0; const d=availableMenu().find(x=>x.name===sel.item); const base=d?(sel.sizeKey==='l'?d.l:d.m):0; return base + toppingCost(); }
 function selfPay(full, sub){ return sub>0 ? Math.max(0, full-sub) : full; }
 function updateSubmit(){
   const ok = session && sel.item && $('person').value.trim();
@@ -340,17 +362,20 @@ $('submit').onclick = async () => {
   const person=$('person').value.trim(); if(!person||!sel.item||!session) return;
   $('submit').disabled=true;
   const isCustom = session.mode==='custom';
+  const note=$('topping').value.trim();
+  const toppingStr = isCustom ? (note||null)
+    : ([...sel.toppings].join('+') + (note ? (sel.toppings.size?'・':'')+note : '')) || null;
   const row = { batch:BATCH,
     shop: isCustom ? (session.title||'自訂菜單') : session.shop,
     person, item:sel.item,
     size: isCustom ? null : SIZES.find(s=>s[1]===sel.sizeKey)[0],
     sugar: isCustom ? null : sel.sugar,
     ice: isCustom ? null : sel.ice,
-    topping:$('topping').value.trim()||null, price:priceOf(),
+    topping:toppingStr, price:priceOf(),
     subsidy: session.subsidy||0, session_id: session.id };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
-  $('topping').value=''; toast('✓ 已送出！'); load();
+  $('topping').value=''; sel.toppings.clear(); buildToppings(); toast('✓ 已送出！'); load();
 };
 
 async function load(){
@@ -456,8 +481,8 @@ $('dice').onclick = () => {
 };
 // 取消重選：清空目前選擇（不退還骰子次數）
 $('cancelpick').onclick = () => {
-  sel.item=null; sel.sizeKey='m'; sel.sugar='半糖'; sel.ice='少冰';
-  pickItem(''); pickChip('sizes','m'); pickChip('sugars','半糖'); pickChip('ices','少冰');
+  sel.item=null; sel.sizeKey='m'; sel.sugar='半糖'; sel.ice='少冰'; sel.toppings.clear();
+  pickItem(''); pickChip('sizes','m'); pickChip('sugars','半糖'); pickChip('ices','少冰'); buildToppings();
   $('topping').value='';
   updateSubmit(); toast('已清空，可自己重選');
 };
@@ -496,6 +521,7 @@ function applySession(){
     $('groupBanner').innerHTML = `🧋 指定店家：<b>${session.shop}</b>${subTxt}`
       + ((session.allowed_items||[]).length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
   }
+  sel.toppings.clear(); buildToppings();
   renderShops(); buildItems(); updateSubmit(); load();
 }
 async function loadSessions(){
