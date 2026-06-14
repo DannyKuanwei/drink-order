@@ -141,7 +141,7 @@
   </div>
 
   <!-- 團主開團（放最下面，一般人不用碰）-->
-  <div class="card">
+  <div class="card" id="leaderCard">
     <h2>🧑‍💼 團主開團 / 模式設定 <button class="mini" id="leaderToggle">展開</button></h2>
     <p class="muted-note">一般人只要在上面點餐即可。團主才需要這裡：限定店家、自訂菜單、設補助。</p>
     <div id="leaderPanel" style="display:none">
@@ -255,6 +255,8 @@ document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
 let sessions = [];     // 今日所有團
 let session = null;    // 目前選的團（active）
+const TEAM_ID = new URLSearchParams(location.search).get('team');  // 一團一網址：?team=<id>
+const teamLink = id => location.origin + location.pathname + '?team=' + id;
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 const shopOf = id => SHOPS.find(s=>s.id===id);
@@ -335,14 +337,16 @@ $('submit').onclick = async () => {
     sugar: isCustom ? null : sel.sugar,
     ice: isCustom ? null : sel.ice,
     topping:$('topping').value.trim()||null, price:priceOf(),
-    subsidy: session.subsidy||0 };
+    subsidy: session.subsidy||0, session_id: session.id };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
   $('topping').value=''; toast('✓ 已送出！'); load();
 };
 
 async function load(){
-  const { data, error } = await sb.from('drink_orders').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
+  let q = sb.from('drink_orders').select('*').eq('batch',BATCH);
+  if(TEAM_ID) q = q.eq('session_id', TEAM_ID);     // 一團一網址：只看這團
+  const { data, error } = await q.order('created_at',{ascending:true});
   if(!error) render(data||[]);
 }
 
@@ -452,7 +456,7 @@ $('cancelpick').onclick = () => {
 function teamLabel(s){ return s.mode==='custom' ? (s.title||'自訂菜單') : s.shop; }
 function renderTeamPicker(){
   const wrap=$('teamPickerWrap'), el=$('teamPicker');
-  if(sessions.length===0){ wrap.style.display='none'; el.innerHTML=''; return; }
+  if(TEAM_ID || sessions.length===0){ wrap.style.display='none'; el.innerHTML=''; return; }  // 單團網址不顯示選團
   wrap.style.display=''; el.innerHTML='';
   sessions.forEach(s=>{
     const c=document.createElement('button'); c.className='chip'+(session&&s.id===session.id?' on':'');
@@ -489,8 +493,16 @@ async function loadSessions(){
   sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
     id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||''
   }));
-  const keep = session && session.id;
-  session = sessions.find(s=>s.id===keep) || sessions[0] || null;
+  if(TEAM_ID){
+    // 一團一網址：鎖定該團、隱藏團主面板
+    session = sessions.find(s=>s.id===TEAM_ID) || null;
+    const lc=$('leaderCard'); if(lc) lc.style.display='none';
+    if(session){ $('sub').textContent = `${teamLabel(session)}　${BATCH}`; }
+    else { $('notOpen').innerHTML='🔒 這個團不存在或已關閉<br><span>請向團主索取最新連結</span>'; }
+  } else {
+    const keep = session && session.id;
+    session = sessions.find(s=>s.id===keep) || sessions[0] || null;
+  }
   renderTeamPicker(); renderLeaderTeams(); applySession();
 }
 
@@ -513,12 +525,14 @@ function renderLeaderTeams(){
   sessions.forEach(s=>{
     const tag=document.createElement('span'); tag.className='teamtag';
     tag.appendChild(document.createTextNode((s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s)));
-    const x=document.createElement('button'); x.className='x'; x.textContent='×';
+    const lk=document.createElement('button'); lk.className='x'; lk.textContent='🔗'; lk.title='複製這團的連結';
+    lk.onclick=()=>{ const url=teamLink(s.id); navigator.clipboard.writeText(url).then(()=>toast('✓ 已複製連結，可貼到群組'),()=>prompt('複製這團的連結：',url)); };
+    const x=document.createElement('button'); x.className='x'; x.textContent='×'; x.title='關閉這團';
     x.onclick=async()=>{ if(!confirm(`關閉「${teamLabel(s)}」這團？\n（已點的訂單會保留）`)) return;
       const {error}=await sb.from('drink_sessions').delete().eq('id',s.id);
       if(error){ toast('關閉失敗：'+error.message); return; }
       toast('已關閉這團'); await loadSessions(); };
-    tag.appendChild(x); el.appendChild(tag);
+    tag.appendChild(lk); tag.appendChild(x); el.appendChild(tag);
   });
 }
 // 重置「開新團」編輯器
