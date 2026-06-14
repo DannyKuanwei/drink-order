@@ -14,6 +14,8 @@
   header .sub { color:var(--muted); font-size:13px; margin-top:4px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px; box-shadow:0 2px 10px rgba(120,80,40,.05); }
   .card h2 { margin:0 0 12px; font-size:16px; letter-spacing:1px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .lead { margin:0 0 14px; font-size:14px; color:var(--brand); font-weight:800; background:#fbf1e7; border-radius:10px; padding:10px 12px; text-align:center; }
+  .muted-note { margin:0 0 2px; font-size:12px; color:var(--muted); line-height:1.6; }
   label.field { display:block; font-size:12px; color:var(--muted); margin:12px 0 6px; font-weight:700; letter-spacing:1px; }
   input[type=text] { width:100%; padding:12px; border:1px solid var(--line); border-radius:12px; font-size:16px; outline:none; font-family:inherit; }
   input[type=text]:focus { border-color:var(--brand2); }
@@ -79,40 +81,9 @@
     <div class="sub" id="sub">今日批次・載入中…</div>
   </header>
 
-  <!-- 團主開團 -->
   <div class="card">
-    <h2>🧑‍💼 團主開團 <button class="mini" id="leaderToggle">設定</button></h2>
-    <div id="leaderPanel" style="display:none">
-      <label class="field">模式</label>
-      <div class="chips" id="modeChips">
-        <button class="chip" data-mode="open">自由模式（各自選店）</button>
-        <button class="chip" data-mode="group">團主開團（限定店家）</button>
-        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點）</button>
-      </div>
-      <div id="groupSettings" style="display:none">
-        <label class="field">指定店家</label>
-        <div class="chips shopchips" id="leaderShops"></div>
-        <label class="field">開放品項（不勾＝全部開放）</label>
-        <div class="leaderitems" id="leaderItems"></div>
-      </div>
-      <div id="customSettings" style="display:none">
-        <label class="field">這團的名稱（例如：今日便當、下午茶）</label>
-        <input type="text" id="customTitle" placeholder="輸入團名" autocomplete="off" />
-        <label class="field">自訂品項（名稱＋價格，可上傳照片）</label>
-        <div id="customRows"></div>
-        <button class="mini" id="addCustomRow" style="margin:8px 0 0">＋ 新增一項</button>
-      </div>
-      <div id="subsidyWrap" style="display:none">
-        <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
-        <input type="number" id="subsidyInput" min="0" placeholder="例如 50" />
-      </div>
-      <button class="submit" id="saveSession" style="margin-top:14px">儲存 / 開團</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>📝 我要訂</h2>
     <div class="groupbanner" id="groupBanner" style="display:none"></div>
+    <p class="lead">填名字 → 選餐點 → 按送出，大家即時看到 👇</p>
     <label class="field">你的名字</label>
     <input type="text" id="person" placeholder="輸入姓名（會記住）" autocomplete="off" />
 
@@ -141,7 +112,6 @@
     <input type="text" id="topping" placeholder="例如：加珍珠、換燕麥奶…" autocomplete="off" />
 
     <button class="submit" id="submit" disabled>請先選店家與品項</button>
-    <div class="warn">菜單依岡山各店實際照片建立。得正、五十嵐已附電話；較密的菜單(Mr.Wish/金茶伍/水巷/樂法)請順手核對價格，要補品項或改價跟 Claude 說即可。</div>
   </div>
 
   <div class="card">
@@ -160,9 +130,40 @@
     <div id="shopTally"></div>
   </div>
 
+  <!-- 團主開團（放最下面，一般人不用碰）-->
+  <div class="card">
+    <h2>🧑‍💼 團主開團 / 模式設定 <button class="mini" id="leaderToggle">展開</button></h2>
+    <p class="muted-note">一般人只要在上面點餐即可。團主才需要這裡：限定店家、自訂菜單、設補助。</p>
+    <div id="leaderPanel" style="display:none">
+      <label class="field">模式</label>
+      <div class="chips" id="modeChips">
+        <button class="chip" data-mode="open">自由模式（各自選店）</button>
+        <button class="chip" data-mode="group">團主開團（限定店家）</button>
+        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點）</button>
+      </div>
+      <div id="groupSettings" style="display:none">
+        <label class="field">指定店家</label>
+        <div class="chips shopchips" id="leaderShops"></div>
+        <label class="field">開放品項（不勾＝全部開放）</label>
+        <div class="leaderitems" id="leaderItems"></div>
+      </div>
+      <div id="customSettings" style="display:none">
+        <label class="field">這團的名稱（例如：今日便當、下午茶）</label>
+        <input type="text" id="customTitle" placeholder="輸入團名" autocomplete="off" />
+        <label class="field">自訂品項（名稱＋價格，可上傳照片）</label>
+        <div id="customRows"></div>
+        <button class="mini" id="addCustomRow" style="margin:8px 0 0">＋ 新增一項</button>
+      </div>
+      <div id="subsidyWrap" style="display:none">
+        <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
+        <input type="number" id="subsidyInput" min="0" placeholder="例如 50" />
+      </div>
+      <button class="submit" id="saveSession" style="margin-top:14px">儲存 / 開團</button>
+    </div>
+  </div>
+
   <footer>
-    多店家版・資料即時同步，所有人看到同一張單。<br>
-    要改菜單價格或填電話，跟 Claude 說或編輯 index.html 的 SHOPS。
+    資料即時同步，所有人看到同一張單。
   </footer>
 </div>
 <div class="toast" id="toast"></div>
