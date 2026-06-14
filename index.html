@@ -85,6 +85,12 @@
     <div class="sub" id="sub">今日批次・載入中…</div>
   </header>
 
+  <!-- 今日開的團・分享連結（在最上面）-->
+  <div class="card" id="teamsCard" style="display:none">
+    <h2>🔗 今日開的團（複製連結分享給群組）</h2>
+    <div id="leaderTeams"></div>
+  </div>
+
   <div class="card">
     <div id="teamPickerWrap" style="display:none">
       <label class="field">選擇要訂哪一團</label>
@@ -145,9 +151,6 @@
     <h2>🧑‍💼 團主開團 / 模式設定 <button class="mini" id="leaderToggle">展開</button></h2>
     <p class="muted-note">一般人只要在上面點餐即可。團主才需要這裡：限定店家、自訂菜單、設補助。</p>
     <div id="leaderPanel" style="display:none">
-      <label class="field">今日已開的團（按 × 可關閉）</label>
-      <div id="leaderTeams"></div>
-      <hr style="border:none;border-top:1px solid var(--line);margin:16px 0" />
       <label class="field">開新團 — 選模式</label>
       <div class="chips" id="modeChips">
         <button class="chip" data-mode="group">限定店家（從 7 間飲料店選一間）</button>
@@ -520,8 +523,9 @@ function refreshLeaderSections(){
 }
 // 今日已開的團清單（可關閉）
 function renderLeaderTeams(){
-  const el=$('leaderTeams'); if(!el) return; el.innerHTML='';
-  if(sessions.length===0){ el.innerHTML='<span class="muted-note">尚未開團</span>'; return; }
+  const el=$('leaderTeams'), card=$('teamsCard'); if(!el) return; el.innerHTML='';
+  if(TEAM_ID || sessions.length===0){ if(card) card.style.display='none'; return; }   // 單團網址不顯示
+  if(card) card.style.display='';
   sessions.forEach(s=>{
     const tag=document.createElement('span'); tag.className='teamtag';
     tag.appendChild(document.createTextNode((s.mode==='custom'?'🍱 ':'🧋 ')+teamLabel(s)));
