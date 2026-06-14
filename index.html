@@ -44,6 +44,8 @@
   .dice:disabled { opacity:.55; cursor:not-allowed; border-style:solid; }
   .dice.rolling { animation:wiggle .4s; }
   @keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-4deg)} 75%{transform:rotate(4deg)} }
+  .lastbtn { margin-top:10px; width:100%; padding:11px; border:1.5px solid var(--brand2); background:#fff7ef; color:var(--brand2); border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .lastbtn:active { transform:scale(.98); }
   .cancelpick { margin-top:6px; width:100%; padding:8px; border:none; background:transparent; color:var(--muted); font-size:13px; cursor:pointer; font-family:inherit; text-decoration:underline; }
   .cancelpick:active { color:var(--brand); }
   .submit { margin-top:16px; width:100%; padding:15px; border:none; border-radius:14px; background:var(--brand); color:#fff; font-size:17px; font-weight:800; letter-spacing:2px; cursor:pointer; font-family:inherit; }
@@ -118,6 +120,7 @@
       <p class="lead">填名字 → 選餐點 → 按送出，大家即時看到 👇</p>
       <label class="field">你的名字</label>
       <input type="text" id="person" placeholder="輸入姓名（會記住）" autocomplete="off" />
+      <button class="lastbtn" id="lastBtn" style="display:none">↩ 跟上次一樣（一鍵帶入）</button>
 
       <div id="shopArea" style="display:none">
         <div class="chips shopchips" id="shops"></div>
@@ -308,7 +311,7 @@ function availableMenu(){
 }
 
 $('person').value = localStorage.getItem('drink_person') || '';
-$('person').addEventListener('input', e => { localStorage.setItem('drink_person', e.target.value.trim()); updateSubmit(); updateDice(); });
+$('person').addEventListener('input', e => { localStorage.setItem('drink_person', e.target.value.trim()); updateSubmit(); updateDice(); updateLastBtn(); });
 
 // 店家 chips
 const shopsEl = $('shops');
@@ -391,7 +394,11 @@ $('submit').onclick = async () => {
     subsidy: session.subsidy||0, session_id: session.id };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
-  $('topping').value=''; sel.toppings.clear(); buildToppings(); toast('✓ 已送出！'); load();
+  // 記住這個人這次點的，下次可「跟上次一樣」
+  localStorage.setItem('drink_last_'+person, JSON.stringify({
+    item:sel.item, sizeKey:sel.sizeKey, sugar:sel.sugar, ice:sel.ice,
+    toppings:[...sel.toppings], isCustom }));
+  $('topping').value=''; sel.toppings.clear(); buildToppings(); toast('✓ 已送出！'); load(); updateLastBtn();
 };
 
 async function load(){
@@ -534,6 +541,30 @@ $('cancelpick').onclick = () => {
   updateSubmit(); toast('已清空，可自己重選');
 };
 
+// ── ↩ 跟上次一樣：帶入這個人上次點的（存在 localStorage）──
+function updateLastBtn(){
+  const b=$('lastBtn'); if(!b) return;
+  const name=$('person').value.trim();
+  const has = name && localStorage.getItem('drink_last_'+name) && session && !session.closed;
+  b.style.display = has ? '' : 'none';
+}
+$('lastBtn').onclick = () => {
+  const name=$('person').value.trim();
+  if(!name){ toast('請先填名字'); return; }
+  let last; try{ last=JSON.parse(localStorage.getItem('drink_last_'+name)||'null'); }catch(e){ last=null; }
+  if(!last){ toast('找不到你上次的紀錄'); return; }
+  if(!availableMenu().find(d=>d.name===last.item)){ toast(`上次點的「${last.item}」這團沒有，請手動選`); return; }
+  sel.item=last.item; pickItem(sel.item);
+  if(session && session.mode!=='custom'){
+    sel.sizeKey = last.sizeKey==='l' ? 'l' : 'm';
+    sel.sugar = SUGARS.includes(last.sugar) ? last.sugar : sel.sugar;
+    sel.ice = ICES.includes(last.ice) ? last.ice : sel.ice;
+    sel.toppings = new Set((last.toppings||[]).filter(n=>TOPPINGS.find(t=>t.name===n)));
+    pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice); buildToppings();
+  }
+  updateSubmit(); toast('✓ 已帶入上次：'+last.item);
+};
+
 // ── 多團：載入 / 選團 / 套用 ──
 function teamLabel(s){ return s.mode==='custom' ? (s.title||'自訂菜單') : s.shop; }
 function renderTeamPicker(){
@@ -570,7 +601,7 @@ function applySession(){
       + ((session.allowed_items||[]).length>0 ? `<br>開放品項：${session.allowed_items.join('、')}` : '');
   }
   sel.toppings.clear(); buildToppings();
-  renderShops(); buildItems(); updateSubmit();
+  renderShops(); buildItems(); updateSubmit(); updateLastBtn();
   if(session.closed){ $('orderBody').style.display='none'; $('closedMsg').style.display=''; }
   load();
 }
@@ -713,7 +744,7 @@ $('saveSession').onclick = async ()=>{
 
 sb.channel('drink_orders_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_orders'},()=>load()).subscribe();
 sb.channel('drink_sessions_live').on('postgres_changes',{event:'*',schema:'public',table:'drink_sessions'},()=>loadSessions()).subscribe();
-updateSubmit(); updateDice(); loadSessions();
+updateSubmit(); updateDice(); updateLastBtn(); loadSessions();
 
 // ── LINE LIFF：在 LINE 內開啟時自動帶名字 ──
 const LIFF_ID='2010389802-gPyOd3rI';
@@ -726,7 +757,7 @@ const LIFF_ID='2010389802-gPyOd3rI';
       if(p && p.displayName){
         $('person').value = p.displayName;
         localStorage.setItem('drink_person', p.displayName);
-        updateSubmit(); updateDice();
+        updateSubmit(); updateDice(); updateLastBtn();
       }
     } else if(liff.isInClient()){
       liff.login();                                 // 在 LINE 內但未登入 → 登入
