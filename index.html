@@ -297,6 +297,9 @@ const teamLink = id => location.origin + location.pathname + '?team=' + id;
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 const shopOf = id => SHOPS.find(s=>s.id===id);
+// 「跟上次一樣」依「人＋這一間店/這份菜單」分開記，避免不同店同名飲料搞混
+const sessionKey = () => !session ? '' : (session.mode==='custom' ? 'c:'+(session.title||'自訂菜單') : 's:'+session.shop);
+const lastKey = name => 'drink_last_'+name+'|'+sessionKey();
 // 目前可選的菜單（依目前選的團）
 function availableMenu(){
   if(!session) return [];
@@ -394,8 +397,8 @@ $('submit').onclick = async () => {
     subsidy: session.subsidy||0, session_id: session.id };
   const { error } = await sb.from('drink_orders').insert(row);
   if(error){ toast('送出失敗：'+error.message); updateSubmit(); return; }
-  // 記住這個人這次點的，下次可「跟上次一樣」
-  localStorage.setItem('drink_last_'+person, JSON.stringify({
+  // 記住這個人在「這一間店」點的，下次同店可「跟上次一樣」
+  localStorage.setItem(lastKey(person), JSON.stringify({
     item:sel.item, sizeKey:sel.sizeKey, sugar:sel.sugar, ice:sel.ice,
     toppings:[...sel.toppings], isCustom }));
   $('topping').value=''; sel.toppings.clear(); buildToppings(); toast('✓ 已送出！'); load(); updateLastBtn();
@@ -545,14 +548,16 @@ $('cancelpick').onclick = () => {
 function updateLastBtn(){
   const b=$('lastBtn'); if(!b) return;
   const name=$('person').value.trim();
-  const has = name && localStorage.getItem('drink_last_'+name) && session && !session.closed;
-  b.style.display = has ? '' : 'none';
+  if(!(name && session && !session.closed)){ b.style.display='none'; return; }
+  let last; try{ last=JSON.parse(localStorage.getItem(lastKey(name))||'null'); }catch(e){ last=null; }
+  if(last && last.item){ b.style.display=''; b.textContent=`↩ 跟上次一樣（${last.item}）`; }
+  else { b.style.display='none'; }   // 這間店沒有你的上次紀錄就不顯示
 }
 $('lastBtn').onclick = () => {
   const name=$('person').value.trim();
   if(!name){ toast('請先填名字'); return; }
-  let last; try{ last=JSON.parse(localStorage.getItem('drink_last_'+name)||'null'); }catch(e){ last=null; }
-  if(!last){ toast('找不到你上次的紀錄'); return; }
+  let last; try{ last=JSON.parse(localStorage.getItem(lastKey(name))||'null'); }catch(e){ last=null; }
+  if(!last){ toast('這間店找不到你上次的紀錄'); return; }
   if(!availableMenu().find(d=>d.name===last.item)){ toast(`上次點的「${last.item}」這團沒有，請手動選`); return; }
   sel.item=last.item; pickItem(sel.item);
   if(session && session.mode!=='custom'){
