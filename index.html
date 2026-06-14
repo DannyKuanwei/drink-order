@@ -34,6 +34,10 @@
   .chip { padding:9px 14px; border-radius:999px; border:1.5px solid var(--line); background:#fff; font-size:14px; cursor:pointer; user-select:none; transition:.12s; font-family:inherit; color:var(--ink); }
   .chip.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
   .shopchips .chip.on { background:var(--brand2); border-color:var(--brand2); }
+  .shopchips .chip { display:inline-flex; align-items:center; gap:7px; padding:7px 13px 7px 7px; }
+  .chip .logobox { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:9px; background:#fff; flex:0 0 auto; box-shadow:0 0 0 1px rgba(0,0,0,.06) inset; overflow:hidden; }
+  .chip .logobox img { max-width:30px; max-height:26px; width:auto; height:auto; object-fit:contain; display:block; }
+  .chip .logobox .emo { font-size:20px; line-height:1; }
   .items { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .item { padding:12px; border-radius:14px; border:1.5px solid var(--line); background:#fff; cursor:pointer; text-align:left; transition:.12s; font-family:inherit; }
   .item.on { border-color:var(--brand); background:#fbf1e7; }
@@ -221,7 +225,7 @@ const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 // ── 店家與菜單（依岡山各店實際菜單照片建立，2024）──
 const SHOPS = [
-  { id:'dejeng', name:'得正', phone:'07-6225168', emoji:'🍵', color:'#3b6b3f', tag:'烏龍茶專門', menu:[
+  { id:'dejeng', name:'得正', phone:'07-6225168', emoji:'🍵', color:'#3b6b3f', tag:'烏龍茶專門', logo:'logos/dejeng.svg', menu:[
     {name:'紅茶', m:25, l:30}, {name:'綠茶', m:25, l:30},
     {name:'青烏龍', m:30, l:35}, {name:'焙烏龍', m:30, l:35},
     {name:'奶茶', m:40, l:45}, {name:'焙烏龍奶茶', m:40, l:45},
@@ -231,26 +235,26 @@ const SHOPS = [
     {name:'焙烏龍鮮奶', m:50, l:60}, {name:'青烏龍鮮奶', m:50, l:60},
     {name:'芝士奶蓋紅茶', m:50, l:55}, {name:'芝士奶蓋焙烏龍', m:55, l:60},
   ]},
-  { id:'mrwish', name:'Mr.Wish', phone:'', emoji:'🍋', color:'#4ca64c', tag:'新鮮水果茶', menu:[
+  { id:'mrwish', name:'Mr.Wish', phone:'', emoji:'🍋', color:'#4ca64c', tag:'新鮮水果茶', logo:'logos/mrwish.svg', menu:[
     {name:'珍珠紅茶', m:40, l:55}, {name:'翡翠檸檬', m:60, l:70},
     {name:'葡萄柚翡翠', m:65, l:75}, {name:'黃金鳳梨翡翠', m:65, l:75},
     {name:'芒果鮮果茶', m:80, l:90}, {name:'草莓系列(季節)', m:80, l:90},
     {name:'鮮柚青茶', m:60, l:70}, {name:'多多綠', m:55, l:65},
   ]},
-  { id:'jincha', name:'金茶伍', phone:'', emoji:'🧋', color:'#c08a2e', tag:'台味鮮奶茶', menu:[
+  { id:'jincha', name:'金茶伍', phone:'', emoji:'🧋', color:'#c08a2e', tag:'台味鮮奶茶', logo:'logos/jincha.png', menu:[
     {name:'珍珠厚奶', m:50, l:60}, {name:'蔗香青茶', m:30, l:40},
     {name:'Q粿紅茶', m:45, l:55}, {name:'高山烏龍', m:35, l:45},
     {name:'黃金蕎麥茶', m:40, l:50}, {name:'荔枝小茉莉', m:55, l:65},
     {name:'日光金萱', m:35, l:45}, {name:'柳丁Q粿果粒茶', m:60, l:70},
   ]},
-  { id:'chanung', name:'水巷茶弄', phone:'', emoji:'🍇', color:'#6f4fa0', tag:'紫蘇特調', menu:[
+  { id:'chanung', name:'水巷茶弄', phone:'', emoji:'🍇', color:'#6f4fa0', tag:'紫蘇特調', logo:'logos/chanung.png', menu:[
     {name:'寒天玉小紫蘇', m:65, l:90}, {name:'膠原蛋白小紫蘇', m:65, l:90},
     {name:'桔香小紫蘇', m:55, l:85}, {name:'茉莉蜜紅茶', m:30, l:55},
     {name:'茉莉綠茶', m:30, l:55}, {name:'冬瓜烏龍', m:35, l:65},
     {name:'金鑽鳳梨綠', m:60, l:60}, {name:'滿分水果茶', m:65, l:65},
     {name:'紅茶拿鐵', m:60, l:90}, {name:'珍珠紅茶拿鐵', m:60, l:90},
   ]},
-  { id:'50lan', name:'五十嵐', phone:'07-6242333', emoji:'🥤', color:'#159b8a', tag:'經典國民飲料', menu:[
+  { id:'50lan', name:'五十嵐', phone:'07-6242333', emoji:'🥤', color:'#159b8a', tag:'經典國民飲料', logo:'logos/50lan.png', menu:[
     {name:'茉莉綠茶', m:25, l:30}, {name:'阿薩姆紅茶', m:25, l:30},
     {name:'四季春青茶', m:25, l:30}, {name:'波霸紅', m:25, l:35},
     {name:'檸檬綠', m:40, l:50}, {name:'梅の綠', m:40, l:50},
@@ -260,13 +264,13 @@ const SHOPS = [
     {name:'燕麥奶茶', m:55, l:60}, {name:'阿華田', m:45, l:60},
     {name:'紅茶拿鐵', m:50, l:65}, {name:'冰淇淋紅茶', m:50, l:55},
   ]},
-  { id:'lefa', name:'樂法', phone:'', emoji:'🍎', color:'#d14b46', tag:'鮮果氣泡飲', menu:[
+  { id:'lefa', name:'樂法', phone:'', emoji:'🍎', color:'#d14b46', tag:'鮮果氣泡飲', logo:'logos/lefa.png', menu:[
     {name:'蘋果鮮柚', m:70, l:90}, {name:'蘋果鮮綠', m:70, l:90},
     {name:'蘋果柳橙檸檬', m:75, l:95}, {name:'草莓奶霜(NEW)', m:90, l:90},
     {name:'草莓多多', m:75, l:75}, {name:'芒果系列', m:65, l:80},
     {name:'蜜桃系列', m:70, l:90}, {name:'多多綠', m:50, l:60},
   ]},
-  { id:'guiji', name:'龜記', phone:'', emoji:'🐢', color:'#2c7a6b', tag:'茗品鮮乳茶', menu:[
+  { id:'guiji', name:'龜記', phone:'', emoji:'🐢', color:'#2c7a6b', tag:'茗品鮮乳茶', logo:'logos/guiji.svg', menu:[
     {name:'極品紅茶', m:35, l:35}, {name:'翡翠綠茶', m:35, l:35},
     {name:'三十三紅茶', m:40, l:40}, {name:'碎銀普洱茶', m:40, l:40},
     {name:'花沫烏龍', m:40, l:40}, {name:'豆漿紅茶', m:45, l:45},
@@ -323,11 +327,17 @@ function styleShopChip(c, s, on){
   c.style.borderColor=s.color; c.style.color = on ? '#fff' : s.color;
   c.style.background = on ? s.color : '#fff';
 }
+// logo 放在白底圓角小盒；圖載入失敗時自動退回 emoji
+function shopLogoBox(s){
+  const emo = `<span class="emo">${s.emoji}</span>`;
+  if(!s.logo) return `<span class="logobox">${emo}</span>`;
+  return `<span class="logobox"><img src="${s.logo}" alt="${s.name}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'emo',textContent:'${s.emoji}'}))"></span>`;
+}
 function renderShops(){
   shopsEl.innerHTML='';
   SHOPS.forEach(s => {
     const on=s.id===sel.shop;
-    const c = document.createElement('button'); c.className='chip'+(on?' on':''); c.textContent=`${s.emoji} ${s.name}`;
+    const c = document.createElement('button'); c.className='chip'+(on?' on':''); c.innerHTML=`${shopLogoBox(s)}<span>${s.name}</span>`;
     styleShopChip(c, s, on);
     c.onclick = () => { sel.shop=s.id; sel.item=null; renderShops(); buildItems(); updateSubmit(); };
     shopsEl.appendChild(c);
@@ -586,8 +596,10 @@ function renderTeamPicker(){
   sessions.forEach(s=>{
     const on=session&&s.id===session.id;
     const shop=s.mode==='custom'?null:shopByName(s.shop);
-    const c=document.createElement('button'); c.className='chip'+(on?' on':'');
-    c.textContent=(s.mode==='custom'?'🍱 ':(shop?shop.emoji+' ':'🧋 '))+teamLabel(s)+(s.closed?' ✅已結單':'');
+    const c=document.createElement('button'); c.className='chip'+(on?' on':'')+(shop?' shopchip-logo':'');
+    const badge = shop ? shopLogoBox(shop) : `<span style="font-size:18px">🍱</span>`;
+    c.innerHTML = badge+`<span>${teamLabel(s)}${s.closed?' ✅已結單':''}</span>`;
+    c.style.display='inline-flex'; c.style.alignItems='center'; c.style.gap='7px';
     if(shop){ c.style.borderColor=shop.color; if(on){ c.style.background=shop.color; c.style.color='#fff'; } else c.style.color=shop.color; }
     c.onclick=()=>{ session=s; sel.item=null; el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); applySession(); };
     el.appendChild(c);
@@ -617,9 +629,12 @@ function applySession(){
     gb.style.display='';
     gb.style.background = `linear-gradient(135deg, ${col}, ${col}cc)`;
     gb.style.borderColor = col; gb.style.color = '#fff';
+    const logoBadge = (shop&&shop.logo)
+      ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:12px;background:#fff;flex:0 0 auto;overflow:hidden"><img src="${shop.logo}" alt="${session.shop}" style="max-width:46px;max-height:42px;object-fit:contain" onerror="this.replaceWith(Object.assign(document.createElement('span'),{style:'font-size:30px',textContent:'${shop?shop.emoji:'🧋'}'}))"></span>`
+      : `<span style="font-size:32px;line-height:1">${shop?shop.emoji:'🧋'}</span>`;
     gb.innerHTML =
       `<div style="display:flex;align-items:center;gap:11px">`+
-        `<span style="font-size:32px;line-height:1">${shop?shop.emoji:'🧋'}</span>`+
+        logoBadge+
         `<div style="text-align:left;flex:1">`+
           `<div style="font-size:17px;font-weight:900;letter-spacing:1px">${session.shop}</div>`+
           `<div style="font-size:12px;opacity:.92">${shop?shop.tag:''}${subLine}</div>`+
@@ -672,8 +687,10 @@ function renderLeaderTeams(){
     const row=document.createElement('div'); row.className='teamrow';
     const name=document.createElement('div'); name.className='name';
     const tShop=s.mode==='custom'?null:shopByName(s.shop);
-    const tEmoji=s.mode==='custom'?'🍱':(tShop?tShop.emoji:'🧋');
-    name.innerHTML=`<span>${tEmoji} ${teamLabel(s)}${s.closed?' <small style="color:#2f6b3a;font-weight:700">✅已結單</small>':''}</span>`;
+    const tMark = (tShop&&tShop.logo)
+      ? `<img src="${tShop.logo}" alt="" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;border-radius:5px;background:#fff" onerror="this.replaceWith(document.createTextNode('${tShop.emoji}'))">`
+      : (s.mode==='custom'?'🍱':(tShop?tShop.emoji:'🧋'));
+    name.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">${tMark} ${teamLabel(s)}${s.closed?' <small style="color:#2f6b3a;font-weight:700">✅已結單</small>':''}</span>`;
     const btns=document.createElement('span'); btns.style.cssText='display:flex;gap:10px;align-items:center';
     const lock=document.createElement('button'); lock.className='close'; lock.style.color=s.closed?'#2f6b3a':'#a9743f';
     lock.textContent = s.closed ? '↺ 重新開單' : '🔒 結單';
@@ -711,7 +728,8 @@ $('modeChips').querySelectorAll('.chip').forEach(c=>{
 function renderLeaderShops(){
   const el=$('leaderShops'); el.innerHTML='';
   SHOPS.forEach(s=>{ const on=s.name===leader.shopName;
-    const c=document.createElement('button'); c.className='chip'+(on?' on':''); c.textContent=`${s.emoji} ${s.name}`;
+    const c=document.createElement('button'); c.className='chip'+(on?' on':''); c.innerHTML=`${shopLogoBox(s)}<span>${s.name}</span>`;
+    c.style.display='inline-flex'; c.style.alignItems='center'; c.style.gap='7px';
     styleShopChip(c, s, on);
     c.onclick=()=>{ leader.shopName=s.name; leader.allowed=new Set(); renderLeaderShops(); renderLeaderItems(); };
     el.appendChild(c); });
