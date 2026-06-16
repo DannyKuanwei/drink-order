@@ -608,35 +608,24 @@ function copyForShop(shop, list){
   navigator.clipboard.writeText(text).then(()=>toast('✓ 已複製，可貼給店家'),()=>{ prompt('複製這段給店家：', text); });
 }
 
-// ── 🎲 幫我骰（每人限 2 次；可取消重選，但取消不退骰子次數）──
-const diceKey = () => 'dice_'+BATCH+'_'+($('person').value.trim()||'_');
-const diceUsedNow = () => parseInt(localStorage.getItem(diceKey()) || '0', 10);
+// ── 🎲 幫我骰（只骰品項，不碰糖度/冰塊；可無限次）──
 function updateDice(){
   const b=$('dice'), name=$('person').value.trim();
   if(!name){ b.disabled=true; b.textContent='🎲 請先填名字'; return; }
-  const left=2-diceUsedNow();
-  if(left<=0){ b.disabled=true; b.textContent='🎲 你的 2 次骰完囉，自己選或維持目前'; }
-  else { b.disabled=false; b.textContent=`🎲 拿不定主意？幫我骰（你還剩 ${left} 次）`; }
+  b.disabled=false; b.textContent='🎲 拿不定主意？幫我骰（可一直骰）';
 }
 $('dice').onclick = () => {
   const name=$('person').value.trim();
-  if(!name || diceUsedNow()>=2) return;
+  if(!name) return;
   const menu=availableMenu();
   if(menu.length===0){ toast('目前沒有可骰的品項'); return; }
-  sel.item = menu[Math.floor(Math.random()*menu.length)].name;
-  pickItem(sel.item);
-  let detail='';
-  if(session && session.mode!=='custom'){   // 餐點不骰容量/甜度/冰塊
-    sel.sizeKey = SIZES[Math.floor(Math.random()*SIZES.length)][1];
-    sel.sugar = SUGARS[Math.floor(Math.random()*SUGARS.length)];
-    sel.ice = ICES[Math.floor(Math.random()*ICES.length)];
-    pickChip('sizes',sel.sizeKey); pickChip('sugars',sel.sugar); pickChip('ices',sel.ice);
-    detail=`（${SIZES.find(s=>s[1]===sel.sizeKey)[0]}・${sel.sugar}・${sel.ice}）`;
-  }
-  localStorage.setItem(diceKey(), diceUsedNow()+1);
+  // 盡量骰到跟目前不同的品項（避免連按骰到同一個）
+  let pick=sel.item;
+  for(let i=0;i<8 && (pick===sel.item) && menu.length>1;i++){ pick=menu[Math.floor(Math.random()*menu.length)].name; }
+  sel.item=pick; pickItem(sel.item);
   const b=$('dice'); b.classList.remove('rolling'); void b.offsetWidth; b.classList.add('rolling');
-  toast(`🎲 骰到：${sel.item}${detail}`);
-  updateDice(); updateSubmit();
+  toast(`🎲 骰到：${sel.item}`);
+  updateSubmit();
 };
 // 取消重選：清空目前選擇（不退還骰子次數）
 $('cancelpick').onclick = () => {
