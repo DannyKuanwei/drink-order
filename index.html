@@ -883,14 +883,32 @@ $('saveMenuBtn').onclick=async()=>{
 // 📷 拍菜單自動分項（後端 Gemini 視覺辨識，金鑰藏於 sunlight-app 伺服器）
 const PARSE_MENU_API='https://morninglight-kids.net/api/parse-menu';
 $('scanMenuBtn').onclick=()=> $('scanMenuFile').click();
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 $('scanMenuFile').onchange=async()=>{
   const file=$('scanMenuFile').files[0]; $('scanMenuFile').value='';
   if(!file) return;
-  $('scanMenuBtn').disabled=true; toast('辨識菜單中…約 10 秒');
+  const btn=$('scanMenuBtn'), orig=btn.textContent;
+  btn.disabled=true;
+  // 即時進度：階段文字 + 跑秒數，讓使用者看到後台在動
+  let t0=Date.now(), stage='壓縮照片中', timer=setInterval(()=>{
+    const s=((Date.now()-t0)/1000).toFixed(0);
+    btn.textContent='⏳ '+stage+'… '+s+'s';
+  },200);
   try{
     const dataUrl=await downscaleImage(file, 1600, 0.8);
-    const res=await fetch(PARSE_MENU_API,{ method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ image:dataUrl }) });
-    const j=await res.json();
+    const MAX=3; let j=null;
+    for(let attempt=1; attempt<=MAX; attempt++){
+      stage = attempt===1 ? '辨識菜單中' : ('伺服器忙線，自動重試 '+attempt+'/'+MAX);
+      let res;
+      try{
+        res=await fetch(PARSE_MENU_API,{ method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ image:dataUrl }) });
+      }catch(netErr){ if(attempt<MAX){ await sleep(1200); continue; } throw netErr; }
+      // 502/503＝後端/Gemini 尖峰，稍候自動重試
+      if((res.status===502||res.status===503) && attempt<MAX){ await sleep(1500); continue; }
+      j=await res.json().catch(()=>null);
+      break;
+    }
+    if(!j){ toast('辨識服務忙線，請過幾秒再拍一次'); return; }
     if(!j.ok){ toast('辨識失敗：'+(j.error||'')); return; }
     if(!j.items||j.items.length===0){ toast('沒辨識到品項，換清楚一點的照片再試'); return; }
     for(const it of j.items){ leader.custom.push({name:it.name, price:it.price||0, photo:null}); }
@@ -898,7 +916,7 @@ $('scanMenuFile').onchange=async()=>{
     renderCustomRows();
     toast('✓ 已辨識 '+j.items.length+' 項，可填店名後「💾 存成店家菜單」');
   }catch(e){ toast('辨識失敗：'+(e&&e.message||e)); }
-  finally{ $('scanMenuBtn').disabled=false; }
+  finally{ clearInterval(timer); btn.disabled=false; btn.textContent=orig; }
 };
 function downscaleImage(file, maxDim, quality){
   return new Promise((resolve,reject)=>{
