@@ -181,26 +181,33 @@
     <h2>🧑‍💼 團主開團 / 模式設定 <button class="mini" id="leaderToggle">展開</button></h2>
     <p class="muted-note">一般人只要在上面點餐即可。團主才需要這裡：限定店家、自訂菜單、設補助。</p>
     <div id="leaderPanel" style="display:none">
-      <label class="field">開新團 — 選模式</label>
-      <div class="chips" id="modeChips">
-        <button class="chip" data-mode="group">限定店家（從 7 間飲料店選一間）</button>
-        <button class="chip" data-mode="custom">自訂菜單（訂任何餐點/便當）</button>
-      </div>
-      <div id="groupSettings" style="display:none">
-        <label class="field">指定店家</label>
-        <div class="chips shopchips" id="leaderShops"></div>
-        <label class="field">開放品項（不勾＝全部開放）</label>
-        <div class="leaderitems" id="leaderItems"></div>
-      </div>
-      <div id="customSettings" style="display:none">
-        <label class="field">這團的名稱（例如：今日便當、下午茶）</label>
-        <input type="text" id="customTitle" placeholder="輸入團名" autocomplete="off" />
-        <label class="field">自訂品項（名稱＋價格，可上傳照片）</label>
+      <div id="customSettings">
+        <!-- 已存菜單庫：拍過/存過的店家，下次直接帶入 -->
+        <div id="savedWrap" style="display:none">
+          <label class="field">📚 已存菜單（點一下帶入）</label>
+          <div class="chips" id="savedTabs">
+            <button class="chip on" data-cat="飲料" type="button">🥤 飲料</button>
+            <button class="chip" data-cat="食物" type="button">🍱 食物</button>
+          </div>
+          <div class="chips" id="savedMenus" style="margin-top:6px"></div>
+        </div>
+
+        <label class="field">店名／團名（例如：得正、今日便當）</label>
+        <input type="text" id="customTitle" placeholder="輸入店名／團名" autocomplete="off" />
+
+        <label class="field">分類</label>
+        <div class="chips" id="catChips">
+          <button class="chip on" data-cat="飲料" type="button">🥤 飲料</button>
+          <button class="chip" data-cat="食物" type="button">🍱 食物</button>
+        </div>
+
+        <label class="field">品項（名稱＋價格，可上傳照片）</label>
         <div id="customRows"></div>
         <button class="mini" id="addCustomRow" style="margin:8px 0 0">＋ 新增一項</button>
         <button class="mini" id="scanMenuBtn" style="margin:8px 0 0 6px">📷 拍菜單自動分項</button>
+        <button class="mini" id="saveMenuBtn" style="margin:8px 0 0 6px;display:none">💾 存成店家菜單</button>
         <input type="file" id="scanMenuFile" accept="image/*" capture="environment" style="display:none">
-        <p class="muted-note" style="margin:6px 0 0">拍一張菜單照片，自動辨識成品項（多尺寸會拆成兩筆），辨識後請檢查價格再開團。</p>
+        <p class="muted-note" style="margin:6px 0 0">拍一張菜單照片自動辨識成品項；辨識後按「💾 存成店家菜單」，下次開團直接帶入，不用再拍。</p>
       </div>
       <div id="subsidyWrap">
         <label class="field">每杯/每份補助上限（公司付，超過自付；0＝不補助）</label>
@@ -700,17 +707,12 @@ async function loadSessions(){
 }
 
 // ── 團主面板（可開多個團）──
-const leader = { mode:'group', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0, title:'', custom:[] };
+const leader = { mode:'custom', shopName:SHOPS[0].name, allowed:new Set(), subsidy:0, title:'', custom:[], category:'飲料' };
 $('leaderToggle').onclick = ()=>{
   const p=$('leaderPanel'), show=p.style.display==='none';
   p.style.display=show?'':'none'; $('leaderToggle').textContent=show?'收合':'展開';
-  if(show){ resetEditor(); renderLeaderTeams(); }
+  if(show){ resetEditor(); renderLeaderTeams(); loadSavedMenus(); }
 };
-function refreshLeaderSections(){
-  $('groupSettings').style.display = leader.mode==='group' ? '' : 'none';
-  $('customSettings').style.display = leader.mode==='custom' ? '' : 'none';
-  $('subsidyWrap').style.display = '';  // 兩種模式都需要補助欄，永遠顯示
-}
 // 今日已開的團清單（可關閉）
 function renderLeaderTeams(){
   const el=$('leaderTeams'), card=$('teamsCard'); if(!el) return; el.innerHTML='';
@@ -750,18 +752,20 @@ function renderLeaderTeams(){
 }
 // 重置「開新團」編輯器
 function resetEditor(){
-  leader.mode='group'; leader.shopName=SHOPS[0].name; leader.allowed=new Set();
-  leader.subsidy=0; leader.title=''; leader.custom=[];
+  leader.mode='custom'; leader.shopName=SHOPS[0].name; leader.allowed=new Set();
+  leader.subsidy=0; leader.title=''; leader.custom=[]; leader.category='飲料';
+  lastScannedDataUrl=null;
   $('subsidyInput').value=''; $('customTitle').value='';
-  $('modeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.mode===leader.mode));
-  refreshLeaderSections();
-  renderLeaderShops(); renderLeaderItems(); renderCustomRows();
+  $('catChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.cat===leader.category));
+  $('subsidyWrap').style.display='';
+  renderCustomRows(); updateSaveMenuBtn();
 }
-$('modeChips').querySelectorAll('.chip').forEach(c=>{
-  c.onclick=()=>{ leader.mode=c.dataset.mode; $('modeChips').querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); refreshLeaderSections(); };
+// 分類切換（這團是飲料還是食物）
+$('catChips').querySelectorAll('.chip').forEach(c=>{
+  c.onclick=()=>{ leader.category=c.dataset.cat; $('catChips').querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c)); };
 });
 function renderLeaderShops(){
-  const el=$('leaderShops'); el.innerHTML='';
+  const el=$('leaderShops'); if(!el) return; el.innerHTML='';
   SHOPS.forEach(s=>{ const on=s.name===leader.shopName;
     const c=document.createElement('button'); c.className='chip'+(on?' on':''); c.innerHTML=`${shopLogoBox(s)}<span>${s.name}</span>`;
     c.style.display='inline-flex'; c.style.alignItems='center'; c.style.gap='7px';
@@ -770,7 +774,7 @@ function renderLeaderShops(){
     el.appendChild(c); });
 }
 function renderLeaderItems(){
-  const el=$('leaderItems'); el.innerHTML='';
+  const el=$('leaderItems'); if(!el) return; el.innerHTML='';
   const shop=SHOPS.find(s=>s.name===leader.shopName);
   (shop?shop.menu:[]).forEach(d=>{
     const lab=document.createElement('label');
@@ -793,11 +797,89 @@ function renderCustomRows(){
     pr.oninput=()=>{ leader.custom[idx].price=parseInt(pr.value||'0',10)||0; };
     const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×';
     rm.onclick=()=>{ leader.custom.splice(idx,1); renderCustomRows(); };
+    nm.oninput=()=>{ leader.custom[idx].name=nm.value; updateSaveMenuBtn(); };
     row.appendChild(ph); row.appendChild(nm); row.appendChild(pr); row.appendChild(rm);
     el.appendChild(row);
   });
+  updateSaveMenuBtn();
 }
 $('addCustomRow').onclick=()=>{ leader.custom.push({name:'',price:0,photo:null}); renderCustomRows(); };
+
+// ── 已存菜單庫：存 / 帶入 / 刪除（依分類找） ──
+let lastScannedDataUrl=null;          // 最近一次拍到的菜單原圖（存菜單時一併上傳）
+let savedMenusList=[];                // 全部已存菜單
+let savedFilter='飲料';               // 目前分頁
+function updateSaveMenuBtn(){
+  const has=leader.custom.some(c=>c.name&&c.name.trim());
+  $('saveMenuBtn').style.display = has ? '' : 'none';
+}
+async function loadSavedMenus(){
+  const { data, error } = await sb.from('drink_saved_menus').select('*').order('updated_at',{ascending:false});
+  if(error){ return; }            // 表還沒建好時靜默
+  savedMenusList=data||[]; renderSavedMenus();
+}
+function renderSavedMenus(){
+  const wrap=$('savedWrap'), el=$('savedMenus'); if(!el) return;
+  wrap.style.display = savedMenusList.length ? '' : 'none';
+  $('savedTabs').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.cat===savedFilter));
+  el.innerHTML='';
+  const list=savedMenusList.filter(m=>(m.category||'飲料')===savedFilter);
+  if(list.length===0){ el.innerHTML='<span class="muted-note">這個分類還沒有存過菜單</span>'; return; }
+  list.forEach(m=>{
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.style.cssText='display:inline-flex;align-items:center;gap:8px;cursor:pointer';
+    const nameBtn=document.createElement('span'); nameBtn.textContent=m.name+'（'+(m.items?.length||0)+'）';
+    nameBtn.onclick=()=>applySavedMenu(m);
+    const del=document.createElement('span'); del.textContent='✕'; del.title='刪除這份菜單';
+    del.style.cssText='color:#c0654a;font-weight:700;padding:0 2px';
+    del.onclick=(e)=>{ e.stopPropagation(); deleteSavedMenu(m); };
+    chip.appendChild(nameBtn); chip.appendChild(del); el.appendChild(chip);
+  });
+}
+$('savedTabs').querySelectorAll('.chip').forEach(c=>{
+  c.onclick=()=>{ savedFilter=c.dataset.cat; renderSavedMenus(); };
+});
+function applySavedMenu(m){
+  leader.custom=(m.items||[]).map(it=>({name:it.name, price:it.price||0, photo:it.photo||null}));
+  leader.category=m.category||'飲料';
+  lastScannedDataUrl=null;
+  $('customTitle').value=m.name||'';
+  $('catChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.cat===leader.category));
+  renderCustomRows();
+  toast('✓ 已帶入「'+(m.name||'')+'」，可直接開團');
+}
+async function deleteSavedMenu(m){
+  if(!confirm('刪除已存菜單「'+(m.name||'')+'」？')) return;
+  const { error } = await sb.from('drink_saved_menus').delete().eq('id',m.id);
+  if(error){ toast('刪除失敗：'+error.message); return; }
+  toast('已刪除'); await loadSavedMenus();
+}
+function dataUrlToBlob(d){
+  const [head,b]=d.split(','); const mime=(head.match(/data:([^;]+)/)||[])[1]||'image/jpeg';
+  const bin=atob(b); const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+$('saveMenuBtn').onclick=async()=>{
+  const name=$('customTitle').value.trim();
+  if(!name){ toast('請先填上面的店名再存'); $('customTitle').focus(); return; }
+  const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0}));
+  if(items.length===0){ toast('還沒有可儲存的品項'); return; }
+  $('saveMenuBtn').disabled=true; toast('儲存菜單中…');
+  try{
+    let photo=null;
+    if(lastScannedDataUrl){
+      const path='menus/'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.jpg';
+      const { error:upErr } = await sb.storage.from('drink-photos').upload(path, dataUrlToBlob(lastScannedDataUrl), { contentType:'image/jpeg' });
+      if(!upErr) photo=sb.storage.from('drink-photos').getPublicUrl(path).data.publicUrl;
+    }
+    const { error } = await sb.from('drink_saved_menus').insert({ name, category:leader.category, items, photo });
+    if(error){ toast('儲存失敗：'+error.message); return; }
+    toast('✓ 已存成店家菜單，下次直接帶入');
+    await loadSavedMenus();
+  }catch(e){ toast('儲存失敗：'+(e&&e.message||e)); }
+  finally{ $('saveMenuBtn').disabled=false; }
+};
 // 📷 拍菜單自動分項（後端 Gemini 視覺辨識，金鑰藏於 sunlight-app 伺服器）
 const PARSE_MENU_API='https://morninglight-kids.net/api/parse-menu';
 $('scanMenuBtn').onclick=()=> $('scanMenuFile').click();
@@ -812,8 +894,9 @@ $('scanMenuFile').onchange=async()=>{
     if(!j.ok){ toast('辨識失敗：'+(j.error||'')); return; }
     if(!j.items||j.items.length===0){ toast('沒辨識到品項，換清楚一點的照片再試'); return; }
     for(const it of j.items){ leader.custom.push({name:it.name, price:it.price||0, photo:null}); }
+    lastScannedDataUrl=dataUrl;            // 留著，存菜單時一併上傳菜單原圖
     renderCustomRows();
-    toast('✓ 已辨識 '+j.items.length+' 項，請檢查價格後再開團');
+    toast('✓ 已辨識 '+j.items.length+' 項，可填店名後「💾 存成店家菜單」');
   }catch(e){ toast('辨識失敗：'+(e&&e.message||e)); }
   finally{ $('scanMenuBtn').disabled=false; }
 };
@@ -843,14 +926,9 @@ async function uploadCustomPhoto(idx, file){
 }
 $('saveSession').onclick = async ()=>{
   const subsidy=Math.max(0, parseInt($('subsidyInput').value||'0',10)||0);
-  let payload;
-  if(leader.mode==='group'){
-    payload={ batch:BATCH, mode:'group', shop:leader.shopName, allowed_items:[...leader.allowed], subsidy, custom_items:[], title:null };
-  } else {
-    const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0, photo:c.photo||null}));
-    if(items.length===0){ toast('請至少新增一個有名稱的品項'); return; }
-    payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單') };
-  }
+  const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0, photo:c.photo||null}));
+  if(items.length===0){ toast('請至少新增一個有名稱的品項（或從已存菜單帶入）'); return; }
+  const payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單') };
   const { error } = await sb.from('drink_sessions').insert(payload);
   if(error){ toast('開團失敗：'+error.message); return; }
   toast('✓ 已開團！所有人畫面已更新');
