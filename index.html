@@ -136,8 +136,10 @@
       <button class="cancelpick" id="cancelpick">↩ 取消重選（清空目前選擇）</button>
 
       <div id="drinkOpts">
-        <label class="field">容量</label>
-        <div class="chips" id="sizes"></div>
+        <div id="sizeWrap">
+          <label class="field">容量</label>
+          <div class="chips" id="sizes"></div>
+        </div>
 
         <label class="field">甜度</label>
         <div class="chips" id="sugars"></div>
@@ -353,14 +355,14 @@ const SHOPS = [
     {name:'檸檬梅子', m:40, l:45}, {name:'阿華田', m:40, l:45},
   ]},
 ];
-const SUGARS = ['正常','少糖','半糖','微糖','無糖'];
-const ICES   = ['正常冰','少冰','微冰','去冰','熱'];
+const SUGARS = ['1分糖','3分糖','5分糖','全糖'];
+const ICES   = ['正常','少冰','微冰','去冰','熱'];
 const SIZES  = [['中杯','m'],['大杯','l']];
 
 const BATCH = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Taipei'})).toLocaleDateString('en-CA');
 document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 
-const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'半糖', ice:'少冰' };
+const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'5分糖', ice:'正常' };
 let sessions = [];     // 今日所有團
 let session = null;    // 目前選的團（active）
 const TEAM_ID = new URLSearchParams(location.search).get('team');  // 一團一網址：?team=<id>
@@ -436,8 +438,8 @@ function buildChips(elId, list, getVal, getLabel, initVal, onPick){
 function pickChip(elId, val){ $(elId).querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', x.dataset.val===String(val))); }
 function pickItem(name){ $('items').querySelectorAll('.item').forEach(x=>x.classList.toggle('on', x.dataset.name===name)); }
 buildChips('sizes', SIZES, v=>v[1], v=>v[0], 'm', v=>sel.sizeKey=v);
-buildChips('sugars', SUGARS, v=>v, v=>v, '半糖', v=>sel.sugar=v);
-buildChips('ices', ICES, v=>v, v=>v, '少冰', v=>sel.ice=v);
+buildChips('sugars', SUGARS, v=>v, v=>v, '5分糖', v=>sel.sugar=v);
+buildChips('ices', ICES, v=>v, v=>v, '正常', v=>sel.ice=v);
 
 function priceOf(){ if(!sel.item) return 0; const d=availableMenu().find(x=>x.name===sel.item); const base=d?(sel.sizeKey==='l'?d.l:d.m):0; return base; }
 function selfPay(full, sub){ return sub>0 ? Math.max(0, full-sub) : full; }
@@ -463,14 +465,15 @@ $('submit').onclick = async () => {
   const person=$('person').value.trim(); if(!person||!sel.item||!session) return;
   $('submit').disabled=true;
   const isCustom = session.mode==='custom';
+  const isDrink = isCustom ? ((session.category||'飲料')==='飲料') : true;   // group 一律飲料
   const note=$('topping').value.trim();
   const toppingStr = note || null;
   const row = { batch:BATCH,
     shop: isCustom ? (session.title||'自訂菜單') : session.shop,
     person, item:sel.item,
-    size: isCustom ? null : SIZES.find(s=>s[1]===sel.sizeKey)[0],
-    sugar: isCustom ? null : sel.sugar,
-    ice: isCustom ? null : sel.ice,
+    size: isCustom ? null : SIZES.find(s=>s[1]===sel.sizeKey)[0],   // 容量已併在品項
+    sugar: isDrink ? sel.sugar : null,
+    ice: isDrink ? sel.ice : null,
     topping:toppingStr, price:priceOf(),
     subsidy: session.subsidy||0, session_id: session.id, qty:getQty() };
   let { error } = await sb.from('drink_orders').insert(row);
@@ -637,8 +640,8 @@ $('dice').onclick = () => {
 };
 // 取消重選：清空目前選擇（不退還骰子次數）
 $('cancelpick').onclick = () => {
-  sel.item=null; sel.sizeKey='m'; sel.sugar='半糖'; sel.ice='少冰';
-  pickItem(''); pickChip('sizes','m'); pickChip('sugars','半糖'); pickChip('ices','少冰');
+  sel.item=null; sel.sizeKey='m'; sel.sugar='5分糖'; sel.ice='正常';
+  pickItem(''); pickChip('sizes','m'); pickChip('sugars','5分糖'); pickChip('ices','正常');
   $('topping').value=''; $('qtyInput').value='1';
   updateSubmit(); toast('已清空，可自己重選');
 };
@@ -696,14 +699,17 @@ function applySession(){
   const gb=$('groupBanner'); gb.style.background=''; gb.style.color=''; gb.style.borderColor='';
   if(session.mode==='custom'){
     sel.item=null;
-    $('shopArea').style.display='none'; $('drinkOpts').style.display='none';   // 餐點不用容量/甜度/冰塊
+    const isDrink = (session.category||'飲料')==='飲料';
+    $('shopArea').style.display='none';
+    $('drinkOpts').style.display = isDrink ? '' : 'none';   // 飲料顯示糖度/冰塊；食物不顯示
+    $('sizeWrap').style.display = 'none';                    // 容量已併在品項，不另選
     const subTxt = session.subsidy>0 ? `　・　公司每份補助 $${session.subsidy}，超過自付` : '';
     $('groupBanner').style.display='';
-    $('groupBanner').innerHTML = `🍱 <b>${session.title||'自訂菜單'}</b>${subTxt}`;
+    $('groupBanner').innerHTML = `${isDrink?'🥤':'🍱'} <b>${session.title||'自訂菜單'}</b>${subTxt}`;
   } else {
     const shop = shopByName(session.shop);
     if(shop && sel.shop!==shop.id){ sel.shop=shop.id; sel.item=null; }
-    $('shopArea').style.display='none'; $('drinkOpts').style.display='';
+    $('shopArea').style.display='none'; $('drinkOpts').style.display=''; $('sizeWrap').style.display='';
     const col = shop ? shop.color : '#2f6b3a';
     const subLine = session.subsidy>0 ? `　・　公司每杯補助 $${session.subsidy}` : '';
     const allowLine = (session.allowed_items||[]).length>0 ? `<div style="font-size:12px;opacity:.92;margin-top:5px">開放品項：${session.allowed_items.join('、')}</div>` : '';
@@ -730,7 +736,7 @@ function applySession(){
 async function loadSessions(){
   const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
   sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
-    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', closed:!!s.closed
+    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', category:s.category||'飲料', closed:!!s.closed
   }));
   if(TEAM_ID){
     // 一團一網址：鎖定該團、隱藏團主面板
@@ -985,7 +991,7 @@ $('saveSession').onclick = async ()=>{
   const subsidy=Math.max(0, parseInt($('subsidyInput').value||'0',10)||0);
   const items=leader.custom.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), price:c.price||0, photo:c.photo||null}));
   if(items.length===0){ toast('請至少新增一個有名稱的品項（或從已存菜單帶入）'); return; }
-  const payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單') };
+  const payload={ batch:BATCH, mode:'custom', shop:null, allowed_items:[], subsidy, custom_items:items, title:($('customTitle').value.trim()||'自訂菜單'), category:leader.category||'飲料' };
   const { error } = await sb.from('drink_sessions').insert(payload);
   if(error){ toast('開團失敗：'+error.message); return; }
   toast('✓ 已開團！所有人畫面已更新');
