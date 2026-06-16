@@ -593,8 +593,12 @@ function renderPay(rows){
 // 把某店訂單彙整成可貼給店家的文字（按 品項+容量+甜度+冰塊 加總）
 function copyForShop(shop, list){
   const agg={};
-  list.forEach(r=>{ const key=`${r.item}｜${r.size}｜${r.sugar}｜${r.ice}${r.topping?'｜'+r.topping:''}`; agg[key]=(agg[key]||0)+qtyOf(r); });
-  const lines=Object.entries(agg).map(([k,n])=>{ const p=k.split('｜'); return `${p[0]}（${p.slice(1).join(' ')}）×${n}`; });
+  list.forEach(r=>{
+    const opts=[r.size,r.sugar,r.ice,r.topping].filter(v=>v!=null && String(v).trim() && String(v)!=='null');
+    const key=`${r.item}｜${opts.join(' ')}`;
+    agg[key]=(agg[key]||0)+qtyOf(r);
+  });
+  const lines=Object.entries(agg).map(([k,n])=>{ const [item,opt]=k.split('｜'); return opt ? `${item}（${opt}）×${n}` : `${item}×${n}`; });
   const cups=list.reduce((s,r)=>s+qtyOf(r),0), money=list.reduce((s,r)=>s+(r.price||0)*qtyOf(r),0);
   const phone=(shopOf(SHOPS.find(s=>s.name===shop)?.id)||{}).phone;
   const text = `【${shop}】${BATCH} 訂單\n`+lines.join('\n')+`\n———\n共 ${cups} 杯，金額約 $${money}`+(phone?`\n店家電話：${phone}`:'');
