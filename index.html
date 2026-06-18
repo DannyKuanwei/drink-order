@@ -595,16 +595,25 @@ function renderPay(rows){
 
 // 把某店訂單彙整成可貼給店家的文字（按 品項+容量+甜度+冰塊 加總）
 function copyForShop(shop, list){
-  const agg={};
+  // 依品項分組，組內再依「品項＋選項」加總；都照首次出現的順序排
+  const groups={}; const itemOrder=[];
   list.forEach(r=>{
-    const opts=[r.size,r.sugar,r.ice,r.topping].filter(v=>v!=null && String(v).trim() && String(v)!=='null');
-    const key=`${r.item}｜${opts.join(' ')}`;
-    agg[key]=(agg[key]||0)+qtyOf(r);
+    if(!itemOrder.includes(r.item)) itemOrder.push(r.item);
+    const opts=[r.size,r.sugar,r.ice,r.topping].filter(v=>v!=null && String(v).trim() && String(v)!=='null').join(' ');
+    const g=(groups[r.item]=groups[r.item]||{order:[],agg:{}});
+    if(!(opts in g.agg)) g.order.push(opts);
+    g.agg[opts]=(g.agg[opts]||0)+qtyOf(r);
   });
-  const lines=Object.entries(agg).map(([k,n])=>{ const [item,opt]=k.split('｜'); return opt ? `${item}（${opt}）×${n}` : `${item}×${n}`; });
+  // 每個品項一個小標題＋小計，底下列出各口味
+  const blocks=itemOrder.map(item=>{
+    const g=groups[item];
+    const sub=g.order.reduce((s,o)=>s+g.agg[o],0);
+    const sublines=g.order.map(o=>`・${o?o+' ':''}×${g.agg[o]}`);
+    return `${item}（小計 ${sub} 杯）\n`+sublines.join('\n');
+  });
   const cups=list.reduce((s,r)=>s+qtyOf(r),0), money=list.reduce((s,r)=>s+(r.price||0)*qtyOf(r),0);
   const phone=(shopOf(SHOPS.find(s=>s.name===shop)?.id)||{}).phone;
-  const text = `【${shop}】${BATCH} 訂單\n`+lines.join('\n')+`\n———\n共 ${cups} 杯，金額約 $${money}`+(phone?`\n店家電話：${phone}`:'');
+  const text = `【${shop}】${BATCH} 訂單\n\n`+blocks.join('\n\n')+`\n———\n共 ${cups} 杯，金額約 $${money}`+(phone?`\n店家電話：${phone}`:'');
   navigator.clipboard.writeText(text).then(()=>toast('✓ 已複製，可貼給店家'),()=>{ prompt('複製這段給店家：', text); });
 }
 
