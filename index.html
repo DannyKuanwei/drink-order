@@ -491,8 +491,9 @@ $('submit').onclick = async () => {
 };
 
 async function load(){
-  let q = sb.from('drink_orders').select('*').eq('batch',BATCH);
-  if(TEAM_ID) q = q.eq('session_id', TEAM_ID);     // 一團一網址：只看這團
+  let q = sb.from('drink_orders').select('*');
+  if(TEAM_ID) q = q.eq('session_id', TEAM_ID);     // 一團一網址：只看這團，不受今日日期限制
+  else q = q.eq('batch', BATCH);
   const { data, error } = await q.order('created_at',{ascending:true});
   if(!error) render(data||[]);
 }
@@ -732,17 +733,20 @@ function applySession(){
   load();
 }
 async function loadSessions(){
-  const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
-  sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
-    id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', category:s.category||'飲料', closed:!!s.closed
-  }));
   if(TEAM_ID){
-    // 一團一網址：鎖定該團、隱藏團主面板
-    session = sessions.find(s=>s.id===TEAM_ID) || null;
+    // 一團一網址：直接用團 id 撈，不受今日日期限制（可能是先前開的團）
+    const { data } = await sb.from('drink_sessions').select('*').eq('id', TEAM_ID);
+    const s = (data||[])[0];
+    session = s ? { id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', category:s.category||'飲料', closed:!!s.closed, batch:s.batch } : null;
+    sessions = session ? [session] : [];
     const lc=$('leaderCard'); if(lc) lc.style.display='none';
-    if(session){ $('sub').textContent = `${teamLabel(session)}　${BATCH}`; }
+    if(session){ $('sub').textContent = `${teamLabel(session)}　${session.batch||BATCH}`; }
     else { $('notOpen').innerHTML='🔒 這個團不存在或已關閉<br><span>請向團主索取最新連結</span>'; }
   } else {
+    const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
+    sessions = (data||[]).filter(s=>s.mode==='group'||s.mode==='custom').map(s=>({
+      id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', category:s.category||'飲料', closed:!!s.closed
+    }));
     const keep = session && session.id;
     session = sessions.find(s=>s.id===keep) || sessions[0] || null;
   }
