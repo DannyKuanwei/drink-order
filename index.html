@@ -365,7 +365,15 @@ document.getElementById('sub').textContent = `今日批次　${BATCH}`;
 const sel = { shop:SHOPS[0].id, item:null, sizeKey:'m', sugar:'5分糖', ice:'正常' };
 let sessions = [];     // 今日所有團
 let session = null;    // 目前選的團（active）
-const TEAM_ID = new URLSearchParams(location.search).get('team');  // 一團一網址：?team=<id>
+// 一團一網址：?team=<id>。連結貼進句子/訊息時常被多吃一個標點（…597c.、…597c)、…597c。），
+// 那會讓 Supabase 收到非法 uuid 回 400，整頁變成「這個團不存在」。所以只抽出裡面的合法 uuid。
+const RAW_TEAM = new URLSearchParams(location.search).get('team');
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const TEAM_MATCH = RAW_TEAM ? RAW_TEAM.match(UUID_RE) : null;
+const TEAM_ID = TEAM_MATCH ? TEAM_MATCH[0].toLowerCase() : null;
+const TEAM_ID_BAD = !!RAW_TEAM && !TEAM_ID;   // 有帶 team 但裡面沒有合法 uuid
+// 網址被多帶了字元時，順手把位址列修乾淨，之後從這頁複製連結就不會再壞
+if(TEAM_ID && RAW_TEAM !== TEAM_ID){ try{ history.replaceState(null,'',location.pathname+'?team='+TEAM_ID); }catch(e){} }
 const teamLink = id => location.origin + location.pathname + '?team=' + id;
 const $ = id => document.getElementById(id);
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
@@ -491,6 +499,7 @@ $('submit').onclick = async () => {
 };
 
 async function load(){
+  if(TEAM_ID_BAD){ render([]); return; }           // 連結壞掉時不要改撈今天別團的訂單
   let q = sb.from('drink_orders').select('*');
   if(TEAM_ID) q = q.eq('session_id', TEAM_ID);     // 一團一網址：只看這團，不受今日日期限制
   else q = q.eq('batch', BATCH);
@@ -733,14 +742,22 @@ function applySession(){
   load();
 }
 async function loadSessions(){
+  if(TEAM_ID_BAD){
+    // 連結裡的 team 不是合法 uuid（通常是複製時多帶了句尾標點）→ 講清楚，別退回「今日批次」讓人一頭霧水
+    session=null; sessions=[];
+    const lc=$('leaderCard'); if(lc) lc.style.display='none';
+    $('notOpen').innerHTML='🔗 這個連結不完整<br><span>網址結尾多了或少了字元，請重新複製團主給的完整連結</span>';
+    renderTeamPicker(); renderLeaderTeams(); applySession(); return;
+  }
   if(TEAM_ID){
     // 一團一網址：直接用團 id 撈，不受今日日期限制（可能是先前開的團）
-    const { data } = await sb.from('drink_sessions').select('*').eq('id', TEAM_ID);
+    const { data, error } = await sb.from('drink_sessions').select('*').eq('id', TEAM_ID);
     const s = (data||[])[0];
     session = s ? { id:s.id, mode:s.mode, shop:s.shop, allowed_items:s.allowed_items||[], subsidy:s.subsidy||0, custom_items:s.custom_items||[], title:s.title||'', category:s.category||'飲料', closed:!!s.closed, batch:s.batch } : null;
     sessions = session ? [session] : [];
     const lc=$('leaderCard'); if(lc) lc.style.display='none';
     if(session){ $('sub').textContent = `${teamLabel(session)}　${session.batch||BATCH}`; }
+    else if(error){ $('notOpen').innerHTML='⚠️ 讀取失敗<br><span>'+(error.message||'請檢查網路後重新整理')+'</span>'; }
     else { $('notOpen').innerHTML='🔒 這個團不存在或已關閉<br><span>請向團主索取最新連結</span>'; }
   } else {
     const { data } = await sb.from('drink_sessions').select('*').eq('batch',BATCH).order('created_at',{ascending:true});
